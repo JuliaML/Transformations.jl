@@ -16,6 +16,18 @@ import StatsBase: logistic, logit
 
 # transformation_type(t) = error()
 
+
+# TODO:
+# - add input_size/output_size, tranformation/Transformation to LearnBase
+# - add traits to LearnBase?
+
+export
+    transformation,
+    is_learnable,
+    Center,
+    Affine
+
+
 # -------------------------------------------------------
 
 # we can wrap any object which implements the interface, and it becomes a transformation
@@ -24,41 +36,80 @@ immutable Transformation{T,I,O}
 end
 
 transformation(x) = Transformation{typeof(x), length(input_size(x)), length(output_size(x))}(x)
-Base.show{T,I,O}(io::IO, t::Transformation{T,I,O}) = print(io, "T{$I-->$O}($(t.t))")
+Base.show{T,I,O}(io::IO, t::Transformation{T,I,O}) = print(io, "T{$I-->$O}{$(t.t)}")
+
+# just pass it through.  we only need to define `transform!` now
+transform(t::Transformation, x)     = (y = zeros(output_size(t.t)); transform!(y, t.t, x))
+transform!(y, t::Transformation, x) = transform!(y, t.t, x)
+
+# -------------------------------------------------------
+
+# # the "learnable trait"... are there parameters to fit/learn?
+# abstract LearnableTrait
+#     immutable Learnable <: LearnableTrait end
+#     immutable NotLearnable <: LearnableTrait end
+
+# # by default, it can't be learned
+# learnable(x) = NotLearnable()
+
+is_learnable(x) = false
+
+# the non-bang version must have an empty constructor
+# learn{T}(::Type{T}, args...)        = learn!(transformation(T()), args...)
+# learn!(t::Transformation, args...)     = learn!(learnable(t.t), t.t, args...)
+# learn!(::NotLearnable, t, args...)  = error() # TODO: maybe just do nothing?
+# learn!(::Learnable, t, args...)     = learn!(t, args...)
+
+learn{T}(::Type{T}, args...)        = learn!(transformation(T()), args...)
+
+learn!(t::Transformation, args...)  = learn!(Val{is_learnable(t.t)}, t.t, args...)
+learn!(::Type{Val{false}}, t, args...)    = error() # TODO: maybe just do nothing?
+learn!(::Type{Val{true}}, t, args...)     = learn!(t, args...)
 
 # -------------------------------------------------------
 
 # the "randomness trait"... is it static or stochastic?
-abstract Randomness
-    immutable Static <: Randomness end
-    immutable Stochastic <: Randomness end
+abstract RandomnessTrait
+    immutable Static <: RandomnessTrait end
+    immutable Stochastic <: RandomnessTrait end
 
-# everything is static, unless we specify
+# by default, everything is static
 randomness(x) = Static()
 
-rand(t::Transformation, args...) = rand(randomness(t), t, args...)
-rand(::Static, args...) = error()
-rand(::Stochastic, t, args...) = rand(t, args...)
+# pass through to RandomnessTrait definition
+rand(t::Transformation, args...)    = rand(randomness(t.t), t.t, args...)
+rand(::Static, t, args...)          = error()
+rand(::Stochastic, t, args...)      = rand(t, args...)
 
 
 # -------------------------------------------------------
 # some sample transformations
+# notice how we don't need to inherit from a common type tree?
 
-immutable Center{A<:AbstractArray}
+abstract DemoTransform
+
+# we can set traits for a bunch of types like this.  could also use a Union
+learnable(::DemoTransform) = Learnable()
+
+immutable Center{A<:AbstractArray} <: DemoTransform
     mu::A
 end
 
-input_size(t::Center) = size(t.mu)
-output_size(t::Center) = size(t.mu)
+input_size(t::Center)               = size(t.mu)
+output_size(t::Center)              = size(t.mu)
 
-immutable Affine{W<:AbstractMatrix, B<:AbstractVector}
+transform!(y, t::Center, x)         = (y[:] = x - t.mu)
+learn!(t::Center, x)                = (mean!(t.mu, x))  # recomputes for full dataset
+
+immutable Affine{W<:AbstractMatrix, B<:AbstractVector} <: DemoTransform
     w::W
     b::B
 end
 
-input_size(t::Affine) = (size(t.w,2), size(t.b,2))
-output_size(t::Affine) = size(t.b)
-# transformation_type(aff::Affine) = Transformable{1,1}
+input_size(t::Affine)               = (size(t.w,2), size(t.b,2))
+output_size(t::Affine)              = size(t.b)
+
+transform!(y, t::Affine, x)         = (y[:] = x * t.w + t.b)
 
 # -------------------------------------------------------
 # Distributions are generating transformations
