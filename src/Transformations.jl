@@ -39,8 +39,7 @@ export
 
 ## Exported functions ##
 # TODO: should these be defined in LearnBase?
-export invert, invert!,
-       get_inverse, isinvertible
+export invert, invert!, isinvertible
 
 include("common.jl")
 include("static.jl")

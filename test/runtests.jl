@@ -19,6 +19,12 @@ s = 2.3
 tfm = ScaleTransformation(s)
 @test isapprox(xv*s, transform(ScaleTransformation(s), xv))
 @test isapprox(xv+s, transform(ShiftTransformation(s), xv))
+
+tfm = ShiftTransformation(s)
+y = transform(tfm, xv)
+@test isapprox(xv, transform(inv(tfm), y))
+@test isapprox(xv, invert(tfm, y))
+
 #@test isapprox(xv-mean(xv), transform(CenteringTransformation(xv),xv))
 
 ## Generalized Linear Transform ##

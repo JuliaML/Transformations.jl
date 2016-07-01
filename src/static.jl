@@ -5,6 +5,7 @@ invert!(::IdentityTransformation, x) = x
 transform(::IdentityTransformation, x) = copy(x)
 invert(::IdentityTransformation, x) = copy(x)
 isinvertible(::IdentityTransformation) = true
+Base.inv(::IdentityTransformation) = IdentityTransformation()
 
 ##--- Invertible Transforms ---##
 for (t1,f1,t2,f2) in ( (:ExpTransformation, :exp, :LogTransformation, :log),
@@ -20,8 +21,8 @@ for (t1,f1,t2,f2) in ( (:ExpTransformation, :exp, :LogTransformation, :log),
         invert!(::$(t2), x) = map!($(f1),x)
         invert(::$(t1), x) = $(f2)(x)
         invert(::$(t2), x) = $(f1)(x)
-        get_inverse(::$(t1)) = $(t2)()
-        get_inverse(::$(t2)) = $(t1)()
+        Base.inv(::$(t1)) = $(t2)()
+        Base.inv(::$(t2)) = $(t1)()
         isinvertible(::$(t1)) = true
         isinvertible(::$(t2)) = true
     end
@@ -33,12 +34,13 @@ immutable ScaleTransformation{T<:Number} <: Transformation
 end
 ScaleTransformation() = ScaleTransformation(1.0)
 isinvertible(::ScaleTransformation) = true
-function invert!{T}(transform::ScaleTransformation{T}, x::AbstractArray{T})
-    scale!(one(T)/transform.val, x)
+function invert!{T}(tfm::ScaleTransformation{T}, x::AbstractArray{T})
+    scale!(one(T)/tfm.val, x)
 end
-function transform!{T}(transform::ScaleTransformation, x::AbstractArray{T})
-    scale!(transform.val, x)
+function transform!{T}(tfm::ScaleTransformation, x::AbstractArray{T})
+    scale!(tfm.val, x)
 end
+Base.inv{T<:Number}(tfm::ScaleTransformation{T}) = ScaleTransformation(one(T)/tfm.val)
 
 ## --- Shifting --- ##
 immutable ShiftTransformation{T<:Number} <: Transformation
@@ -46,11 +48,12 @@ immutable ShiftTransformation{T<:Number} <: Transformation
 end
 ShiftTransformation() = ShiftTransformation(0.0)
 isinvertible(::ShiftTransformation) = true
-function transform!{T}(transform::ShiftTransformation{T}, x::AbstractArray{T})
-    for i in eachindex(x); x[i] += transform.val; end
+function transform!{T}(tfm::ShiftTransformation{T}, x::AbstractArray{T})
+    for i in eachindex(x); x[i] += tfm.val; end
     x
 end
-function invert!{T}(transform::ShiftTransformation{T}, x::AbstractArray{T})
-    for i in eachindex(x); x[i] -= transform.val; end
+function invert!{T}(tfm::ShiftTransformation{T}, x::AbstractArray{T})
+    for i in eachindex(x); x[i] -= tfm.val; end
     x
 end
+Base.inv(tfm::ShiftTransformation) = ShiftTransformation(-tfm.val)

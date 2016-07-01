@@ -11,20 +11,24 @@ end
 learn!(tfm::CenteringTransformation, x) = (tfm.shift = mean(x); tfm)
 transform!(tfm::CenteringTransformation, x) = (transform!(tfm.shift, x); x)
 invert!(tfm::CenteringTransformation, x) = (invert!(tfm.shift, x); x)
+## What should this return ??
+# Base.inv(tfm::CenteringTransformation) = ??? 
 
-type Standardize{T<:Real}
+type StandardizeTransformation{T<:Real}
     shift::ShiftTransformation{T}
     scale::ScaleTransformation{T}
 end
-function learn!{T}(tfm::Standardize{T}, x)
+function learn!{T}(tfm::StandardizeTransformation{T}, x)
     tfm.shift = mean(x)
     tfm.scale = one(T)/std(x)
 end
-function transform!(tfm::Standardize, x)
+function transform!(tfm::StandardizeTransformation, x)
     transform!(tfm.shift, x)
     transform!(tfm.scale, x)
 end
-function invert!(tfm::Standardize, x)
+function invert!(tfm::StandardizeTransformation, x)
     invert!(tfm.scale, x)
     invert!(tfm.shift, x)
 end
+## What should this return ??
+# Base.inv(tfm::StandardizeTransformation) = ??? 
