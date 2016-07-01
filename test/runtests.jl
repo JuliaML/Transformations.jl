@@ -38,19 +38,30 @@ import OnlineStats: Means
 # tfm = GeneralizedLinearTransformation(Poisson())
 # @test Poisson(λ) == transform(tfm, x)
 
+
+# "link" this object into the transformations world
 Transformations.input_size(m::Means) = size(m.value)
 Transformations.output_size(m::Means) = size(m.value)
-Transformations.transform!(y, m::Means, x) = (y[:] = x - m.value)
 Transformations.is_learnable(m::Means) = true
+Transformations.transform!(y, m::Means, x) = (y[:] = x - m.value)
 Transformations.learn!(m, x) = OnlineStats.fit!(m, x)
 
-m = Means(5); #fit!(m, 1:5)
-t = transformation(m)
-@show t
-@show learn!(t, 1:5)
-@show t
-@show y = transform(t, 10ones(5))
+# instantiate an OnlineStats.Means, which computes an online mean of a vector
+m = Means(5)
 
+# wrap the object in a Transformation, which stores input/output dimensions in its type,
+# and allows for the common functionality to apply to the Transformation object.
+t = transformation(m)
+
+# update/learn the parameters for this transformation
+#   (at this point, we don't care what the transformation is!)
+learn!(t, 1:5)
+
+# center the data by applying the transform. this dispatches generically.
+# we only need to define a single `transform!` method
+y = transform(t, 10ones(5))
+
+# make sure everything worked
 @test y == 10ones(5) - (1:5)
 
 
