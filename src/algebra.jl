@@ -1,7 +1,8 @@
 
 export
     Operator,
-    op
+    op,
+    @ops
 
 """
 The idea here is that an Operator wraps an arbitrary function, and there are static query methods
@@ -37,15 +38,51 @@ function Base.show{F,I,O}(io::IO, o::Operator{F,I,O})
     print(io, "}")
 end
 
+const _mappables = [:sin, :exp, :log, :sigmoid, :tanh]
+const _operators = [:*, :/, :\]
+const _element_ops = [:+, :-, :.*, :./, :max, :min]
+const _aggregators = [:sum, :product, :minimum, :maximum]
+
+const _all_ops = vcat(_mappables, _operators, _element_ops, _aggregators)
 
 @generated function is_mappable{F,I,O}(o::Operator{F,I,O})
-    F in (:sin, :exp, :log, :sigmoid, :tanh) ? :(true) : :(false)
+    if F in _mappables
+        I==O || error("Mappables input and output dimensions should match")
+        :(true)
+    else
+        :(false)
+    end
 end
 @generated function is_operator{F,I,O}(o::Operator{F,I,O})
-    F in (:*, :/, :\) ? :(true) : :(false)
+    F in _operators ? :(true) : :(false)
 end
 @generated function is_element_operator{F,I,O}(o::Operator{F,I,O})
-    F in (:+, :-, :.*, :./, :max, :min) ? :(true) : :(false)
+    F in _element_ops ? :(true) : :(false)
+end
+@generated function is_aggregator{F,I,O}(o::Operator{F,I,O})
+    F in _aggregators ? :(true) : :(false)
+end
+
+
+type OpGraph{I,O} <: AbstractTransformation{I,O}
+    nodes::Dict{Symbol,AbstractTransformation}
+    edges::Dict{AbstractTransformation, AbstractTransformation}
+    input_nodes::Vector{AbstractTransformation}
+    output_nodes::Vector{AbstractTransformation}
+end
+
+function subgraph(ops::OpGraph, expr::Expr)
+    expr.head == :call || error("Parse error in ops.  Expected `call`: $expr")
+    fsym = expr.args[1]
+    fsym in _all_ops || error("Parse error in ops. Function is not in _all_ops: $fsym")
+    
+end
+
+function subgraph(ops::OpGraph, s::Symbol)
+
+macro ops(expr, I::Int, O::Int)
+    dump(expr, 20)
+    ops = OpGraph{I,O}()
 end
 
 #####

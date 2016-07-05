@@ -5,6 +5,8 @@ module Transformations
 using Reexport
 @reexport using LearnBase
 
+using RecipesBase
+
 import Base: rand
 import LearnBase: transform, transform!, learn, learn!
 import StatsBase: logistic, logit
