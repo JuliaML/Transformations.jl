@@ -2,7 +2,7 @@
 export
     Operator,
     op,
-    @ops
+    @op
 
 """
 The idea here is that an Operator wraps an arbitrary function, and there are static query methods
@@ -65,30 +65,21 @@ end
 
 # -------------------------------------------------------
 
+# input and output nodes allow for easy connectivity
+immutable InputNode{I} <: AbstractTransformation end
+immutable OutputNode{O} <: AbstractTransformation end
 
-immutable InputNode <: AbstractTransformation end
-immutable OutputNode <: AbstractTransformation end
+# a Learnable has no inputs, but produces an output (the parameters)
+immutable Learnable{O} <: AbstractTransformation end
 
-# opgraphs are a lightweight representation of a directed graph of AbstractTransformations
-
+# an OpGraph is a lightweight representation of a directed graph of AbstractTransformations
 type OpGraph{I,O} <: AbstractTransformation{I,O}
     nodes::Vector{AbstractTransformation}
-    source::Vector{Int}
-    destiny::Vector{Int}
-    # nodemap::Dict{Symbol,AbstractTransformation}
-    # edges::Dict{AbstractTransformation, AbstractTransformation}
-    # input_nodes::Vector{AbstractTransformation}
-    # output_nodes::Vector{AbstractTransformation}
+    edges::Vector{NTuple{2,Int}}
 end
 
-# function subgraph(ops::OpGraph, expr::Expr)
-#     expr.head == :call || error("Parse error in ops.  Expected `call`: $expr")
-#     fsym = expr.args[1]
-#     fsym in _all_ops || error("Parse error in ops. Function is not in _all_ops: $fsym")
-    
-# end
+# -------------------------------------------------------
 
-# function subgraph(ops::OpGraph, s::Symbol)
 
 """
 We want to build an op graph, where each node has input(s) and output(s)
@@ -122,10 +113,76 @@ a connected graph of transformations.  Some notes:
     of the op graph (or its sub-components).
 """
 
-macro ops(expr, I::Int, O::Int)
-    dump(expr, 20)
-    ops = OpGraph{I,O}()
+const _input_index = 1
+const _output_index = 2
+
+function add_item_to_graph!(graph_nodes, graph_edges, item)
+    @show item typeof(item)
+    if isa(item, Expr)
+        # TODO: 
+    end
 end
+
+function add_edge!(block::Expr, i::Int, j::Int)
+    push!(block, :(push!(g.edges, ($i, $j))))
+end
+
+function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
+    dump(funcexpr, 20)
+    @show inout typeof(inout)
+
+    func_signature, func_body = funcexpr.args
+
+    if !(funcexpr.head in (:(=), :function))
+        error("Must wrap a valid function call!")
+    end
+    if !(isa(func_signature, Expr) && func_signature.head == :call)
+        error("Expected `func_signature = ...` with func_signature as a call Expr... got: $func_signature")
+    end
+
+    func_name = func_signature.args[1]
+    func_args = func_signature.args[2:end]
+    @show func_name func_args
+
+    # TODO: we want to build an OpGraph as a function of Variable, Learnable, and Op components
+    # To simplify, we'll assume that:
+    #   - Expr --> Op
+    #   - Symbol --> haskey(_ops, k) ? Variable : Learnable
+
+    # Variables are not learnable, and they are NOT part of the graph.  They represent the inputs
+    # to the OpGraph.
+
+    block = quote
+        g = OpGraph{$(inout[1]), $(inout[2])}([InputNode{I}(), OutputNode{O}()], [])
+    end
+
+    graph_nodes = [InputNode(), OutputNode()]
+    graph_edges = []
+    for item in func_body
+        add_item_to_graph!(block, graph_nodes, graph_edges, item)
+        
+        # connect this node to the output node, since it is returned from the function
+        add_edge!(block, length(graph_nodes), _output_index)
+    end
+
+    push!(block, :(g))
+    @show block
+    block
+end
+
+macro op(args...)
+    _op_macro(args...)
+end
+
+
+
+
+
+
+
+
+
+
 
 #####
 # below this point is old code:
