@@ -1,6 +1,11 @@
 
 export
     Operator,
+    OpGraph,
+    InputNode,
+    OutputNode,
+    Learnable,
+    AbstractTransformation,
     op,
     @op
 
@@ -29,6 +34,7 @@ end
 
 # convenience to instantiate an Operator
 op(f::Function, I::Int, O::Int) = Operator{Symbol(f), I, O}(f)
+op(s::Symbol, I::Int, O::Int) = Operator{s, I, O}(eval(f))
 
 function Base.show{F,I,O}(io::IO, o::Operator{F,I,O})
     print(io, "Op{$F, $I, $O")
@@ -43,7 +49,15 @@ const _operators = [:*, :/, :\]
 const _element_ops = [:+, :-, :.*, :./, :max, :min]
 const _aggregators = [:sum, :product, :minimum, :maximum]
 
-const _all_ops = vcat(_mappables, _operators, _element_ops, _aggregators)
+function is_op(s::Symbol)
+    for v in (_mappables, _operators, _element_ops, _aggregators)
+        if s in v
+            return true
+        end
+    end
+    false
+end
+# const _all_ops = vcat(_mappables, _operators, _element_ops, _aggregators)
 
 @generated function is_mappable{F,I,O}(o::Operator{F,I,O})
     if F in _mappables
@@ -66,11 +80,13 @@ end
 # -------------------------------------------------------
 
 # input and output nodes allow for easy connectivity
-immutable InputNode{I} <: AbstractTransformation end
-immutable OutputNode{O} <: AbstractTransformation end
+immutable InputNode{I} <: AbstractTransformation{I,I} end
+immutable OutputNode{O} <: AbstractTransformation{O,O} end
 
 # a Learnable has no inputs, but produces an output (the parameters)
-immutable Learnable{O} <: AbstractTransformation end
+immutable Learnable{O} <: AbstractTransformation{0,O}
+    name::Symbol
+end
 
 # an OpGraph is a lightweight representation of a directed graph of AbstractTransformations
 type OpGraph{I,O} <: AbstractTransformation{I,O}
@@ -123,22 +139,54 @@ const _output_index = 2
 
 # remember that numnodes is also the index of the last-added node
 
-function add_item_to_graph!(block::Expr, numnodes, item::Expr, isinput::Bool)
+function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Base.RefValue{Int}, item::Expr)
+    @show input_idx variables numnodes[] item
+    dump(item, 20)
     # TODO: handle the expression
-    numnodes
+    # item is expected to be an "operation"
+    func = shift!(item.args)
+    if item.head == :call && is_op(func)
+        inputs = Int[]
+        for x in item.args
+            add_item_to_graph!(block, input_idx, variables, numnodes, x)
+
+            # the node just added is an input to the op
+            push!(inputs, numnodes[])
+        end
+
+        # now add the op
+        add_node!(block, func, :operation)
+        for idx in inputs
+            add_edge!(block, idx)
+        end
+
+    else
+        if item.head == :line
+            # if it's a line number block, pass through to wrapped arg
+            # add_item_to_graph!(block, input_idx, variables, numnodes, item.args[1])
+            info("line")
+        else
+            error("OpGraph parse error: $item")
+        end
+    end
 end
 
-function add_item_to_graph!(block::Expr, numnodes, item::Symbol, isinput::Bool)
-    if item in _operators
+function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Base.RefValue{Int}, item::Symbol)
+    @show input_idx variables numnodes[] item
+    if item in variables
         # TODO: this is a Variable
+        add_node!(block, numnodes, item, :variable)
+        add_edge!(block, input_idx, numnodes[])
     else
         # TODO: this is a Learnable
+        add_node!(block, numnodes, item, :learnable)
     end
-    numnodes
+    return
 end
 
-function add_node!(block::Expr, node)
-    push!(block.args, esc(:(push!(g.nodes, $node))))
+function add_node!(block::Expr, numnodes, node, nodetype::Symbol)
+    push!(block.args, esc(:(push!(g.nodes, ($(QuoteNode(node)), $(QuoteNode(nodetype)))))))
+    numnodes[] += 1
 end
 
 function add_edge!(block::Expr, i::Int, j::Int)
@@ -159,8 +207,8 @@ function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
     end
 
     func_name = func_signature.args[1]
-    func_args = func_signature.args[2:end]
-    @show func_name func_args
+    variables = func_signature.args[2:end]
+    @show func_name variables
 
     # TODO: we want to build an OpGraph as a function of Variable, Learnable, and Op components
     # To simplify, we'll assume that:
@@ -170,10 +218,12 @@ function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
     # Variables are not learnable, and they are NOT part of the graph.  They represent the inputs
     # to the OpGraph.
 
+    I,O = inout
+
     block = Expr(:block)
     push!(block.args, esc(:(
-        g = OpGraph{$(inout[1]), $(inout[2])}(
-            AbstractTransformation[InputNode{I}(), OutputNode{O}()],
+        g = OpGraph{$I, $O}(
+            AbstractTransformation[InputNode{$I}(), OutputNode{$O}()],
             NTuple{2,Int}[]
         )
     )))
@@ -183,7 +233,7 @@ function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
     # graph_edges = []
     numnodes = Ref(2) # input and output
     for item in func_body.args
-        add_item_to_graph!(block, numnodes, item, true)
+        add_item_to_graph!(block, _input_index, variables, numnodes, item)
         
         # connect this node to the output node, since it is returned from the function
         add_edge!(block, numnodes[], _output_index)
