@@ -78,6 +78,7 @@ type OpGraph{I,O} <: AbstractTransformation{I,O}
     edges::Vector{NTuple{2,Int}}
 end
 
+
 # -------------------------------------------------------
 
 
@@ -116,15 +117,32 @@ a connected graph of transformations.  Some notes:
 const _input_index = 1
 const _output_index = 2
 
-function add_item_to_graph!(graph_nodes, graph_edges, item)
-    @show item typeof(item)
-    if isa(item, Expr)
-        # TODO: 
+# NOTE: in the add_item_to_graph methods, we want to:
+#   - increase the numnodes
+#   - call add_edge! for each connection
+
+# remember that numnodes is also the index of the last-added node
+
+function add_item_to_graph!(block::Expr, numnodes, item::Expr, isinput::Bool)
+    # TODO: handle the expression
+    numnodes
+end
+
+function add_item_to_graph!(block::Expr, numnodes, item::Symbol, isinput::Bool)
+    if item in _operators
+        # TODO: this is a Variable
+    else
+        # TODO: this is a Learnable
     end
+    numnodes
+end
+
+function add_node!(block::Expr, node)
+    push!(block.args, esc(:(push!(g.nodes, $node))))
 end
 
 function add_edge!(block::Expr, i::Int, j::Int)
-    push!(block, :(push!(g.edges, ($i, $j))))
+    push!(block.args, esc(:(push!(g.edges, ($i, $j)))))
 end
 
 function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
@@ -152,20 +170,26 @@ function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
     # Variables are not learnable, and they are NOT part of the graph.  They represent the inputs
     # to the OpGraph.
 
-    block = quote
-        g = OpGraph{$(inout[1]), $(inout[2])}([InputNode{I}(), OutputNode{O}()], [])
-    end
+    block = Expr(:block)
+    push!(block.args, esc(:(
+        g = OpGraph{$(inout[1]), $(inout[2])}(
+            AbstractTransformation[InputNode{I}(), OutputNode{O}()],
+            NTuple{2,Int}[]
+        )
+    )))
+    @show block
 
-    graph_nodes = [InputNode(), OutputNode()]
-    graph_edges = []
-    for item in func_body
-        add_item_to_graph!(block, graph_nodes, graph_edges, item)
+    # graph_nodes = [InputNode(), OutputNode()]
+    # graph_edges = []
+    numnodes = Ref(2) # input and output
+    for item in func_body.args
+        add_item_to_graph!(block, numnodes, item, true)
         
         # connect this node to the output node, since it is returned from the function
-        add_edge!(block, length(graph_nodes), _output_index)
+        add_edge!(block, numnodes[], _output_index)
     end
 
-    push!(block, :(g))
+    push!(block.args, esc(:(return g)))
     @show block
     block
 end
