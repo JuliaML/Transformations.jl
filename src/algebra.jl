@@ -34,7 +34,7 @@ end
 
 # convenience to instantiate an Operator
 op(f::Function, I::Int, O::Int) = Operator{Symbol(f), I, O}(f)
-op(s::Symbol, I::Int, O::Int) = Operator{s, I, O}(eval(f))
+op(f::Symbol, I::Int, O::Int) = Operator{f, I, O}(eval(f))
 
 function Base.show{F,I,O}(io::IO, o::Operator{F,I,O})
     print(io, "Op{$F, $I, $O")
@@ -92,6 +92,7 @@ end
 type OpGraph{I,O} <: AbstractTransformation{I,O}
     nodes::Vector{AbstractTransformation}
     edges::Vector{NTuple{2,Int}}
+    names::Vector{String}
 end
 
 
@@ -139,26 +140,30 @@ const _output_index = 2
 
 # remember that numnodes is also the index of the last-added node
 
-function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Base.RefValue{Int}, item::Expr)
-    @show input_idx variables numnodes[] item
+function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Base.RefValue{Int}, item::Expr, opidx)
+    @show "EXPR",item input_idx variables numnodes[]
     dump(item, 20)
     # TODO: handle the expression
     # item is expected to be an "operation"
     func = shift!(item.args)
     if item.head == :call && is_op(func)
-        inputs = Int[]
-        for x in item.args
-            add_item_to_graph!(block, input_idx, variables, numnodes, x)
+        # node_indices = Int[]
 
-            # the node just added is an input to the op
-            push!(inputs, numnodes[])
+        add_node!(block, numnodes, func, :operation)
+        for x in item.args
+            add_item_to_graph!(block, input_idx, variables, numnodes, x, numnodes[])
+
+            # # the node just added is an input to the op
+            # if !(x in variables)
+            #     push!(node_indices, numnodes[])
+            # end
         end
 
         # now add the op
-        add_node!(block, func, :operation)
-        for idx in inputs
-            add_edge!(block, idx)
-        end
+        # add_node!(block, numnodes, func, :operation)
+        # for idx in node_indices
+        #     add_edge!(block, idx, numnodes[])
+        # end
 
     else
         if item.head == :line
@@ -171,21 +176,34 @@ function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Ba
     end
 end
 
-function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Base.RefValue{Int}, item::Symbol)
-    @show input_idx variables numnodes[] item
+function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Base.RefValue{Int}, item::Symbol, opidx)
+    @show "SYM",item input_idx variables numnodes[]
     if item in variables
-        # TODO: this is a Variable
-        add_node!(block, numnodes, item, :variable)
-        add_edge!(block, input_idx, numnodes[])
+        # TODO: this is a Variable... connect input node to this
+        # add_node!(block, numnodes, item, :variable)
+        add_edge!(block, _input_index, opidx)
     else
         # TODO: this is a Learnable
         add_node!(block, numnodes, item, :learnable)
+        add_edge!(block, numnodes[], opidx)
     end
     return
 end
 
 function add_node!(block::Expr, numnodes, node, nodetype::Symbol)
-    push!(block.args, esc(:(push!(g.nodes, ($(QuoteNode(node)), $(QuoteNode(nodetype)))))))
+    nodesym = QuoteNode(node)
+    nodeexpr = if nodetype == :learnable
+        :(Learnable{1}($nodesym))
+    # elseif nodetype == :variable
+
+    elseif nodetype == :operation
+        :(op($nodesym, 1, 1))
+    else
+        error("how do I add this node? $node $nodetype")
+    end
+    # push!(block.args, esc(:(push!(g.nodes, ($(QuoteNode(node)), $(QuoteNode(nodetype)))))))
+    push!(block.args, esc(:(push!(g.nodes, $nodeexpr))))
+    push!(block.args, esc(:(push!(g.names, string($nodesym)))))
     numnodes[] += 1
 end
 
@@ -224,7 +242,8 @@ function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
     push!(block.args, esc(:(
         g = OpGraph{$I, $O}(
             AbstractTransformation[InputNode{$I}(), OutputNode{$O}()],
-            NTuple{2,Int}[]
+            NTuple{2,Int}[],
+            String["Input", "Output"]
         )
     )))
     @show block
@@ -233,13 +252,13 @@ function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
     # graph_edges = []
     numnodes = Ref(2) # input and output
     for item in func_body.args
-        add_item_to_graph!(block, _input_index, variables, numnodes, item)
+        add_item_to_graph!(block, _input_index, variables, numnodes, item, 2)
         
         # connect this node to the output node, since it is returned from the function
         add_edge!(block, numnodes[], _output_index)
     end
 
-    push!(block.args, esc(:(return g)))
+    push!(block.args, esc(:(g)))
     @show block
     block
 end
