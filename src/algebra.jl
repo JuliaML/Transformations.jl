@@ -5,6 +5,7 @@ export
     InputNode,
     OutputNode,
     Learnable,
+    Constant,
     AbstractTransformation,
     op,
     @op
@@ -44,9 +45,9 @@ function Base.show{F,I,O}(io::IO, o::Operator{F,I,O})
     print(io, "}")
 end
 
-const _mappables = [:sin, :exp, :log, :sigmoid, :tanh]
+const _mappables = [:sin, :exp, :log, :sigmoid, :tanh, :sqrt, :^]
 const _operators = [:*, :/, :\]
-const _element_ops = [:+, :-, :.*, :./, :max, :min]
+const _element_ops = [:+, :-, :.*, :./, :max, :min, :.^]
 const _aggregators = [:sum, :product, :minimum, :maximum]
 
 function is_op(s::Symbol)
@@ -88,13 +89,37 @@ immutable Learnable{O} <: AbstractTransformation{0,O}
     name::Symbol
 end
 
+immutable Constant{O} <: AbstractTransformation{0,O}
+    value::Float64
+end
+
 # an OpGraph is a lightweight representation of a directed graph of AbstractTransformations
 type OpGraph{I,O} <: AbstractTransformation{I,O}
     nodes::Vector{AbstractTransformation}
     edges::Vector{NTuple{2,Int}}
-    names::Vector{String}
+    names::Vector{UTF8String}
 end
 
+using PlotRecipes
+@recipe function f(g::OpGraph)
+    arrow --> arrow()
+    markersize --> 50
+    markeralpha --> 0.2
+    linealpha --> 0.4
+    linewidth --> 2
+    names --> g.names
+    func --> :tree
+    root --> :left
+    # RecipesBase.apply_recipe(
+    #     d,
+    #     Int[e[1] for e=g.edges],
+    #     Int[e[2] for e=g.edges],
+    #     names = g.names,
+    #     func = :tree,
+    #     root = :left
+    # )
+    PlotRecipes.GraphPlot((Int[e[1] for e=g.edges], Int[e[2] for e=g.edges]))
+end
 
 # -------------------------------------------------------
 
@@ -140,62 +165,93 @@ const _output_index = 2
 
 # remember that numnodes is also the index of the last-added node
 
-function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Base.RefValue{Int}, item::Expr, opidx)
+function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Base.RefValue{Int}, item, parent_idx)
     @show "EXPR",item input_idx variables numnodes[]
     dump(item, 20)
-    # TODO: handle the expression
-    # item is expected to be an "operation"
-    func = shift!(item.args)
-    if item.head == :call && is_op(func)
+
+    if isa(item, Symbol)
+        _add_symbol_to_graph!(block, numnodes, item, parent_idx, variables)
+    elseif isa(item, Number)
+        _add_const_to_graph!(block, numnodes, item, parent_idx)
+    
+    elseif item.head == :call && is_op(item.args[1])
         # node_indices = Int[]
+        func = shift!(item.args)
 
         add_node!(block, numnodes, func, :operation)
+        this_idx = numnodes[]
         for x in item.args
-            add_item_to_graph!(block, input_idx, variables, numnodes, x, numnodes[])
+            if isa(x, Symbol)
+                _add_symbol_to_graph!(block, numnodes, x, this_idx, variables)
+                # if x in variables
+                #     # TODO: we should have multiple input nodes, one for each variable
+                #     # connect the input node to this op
+                #     add_edge!(block, _input_index, this_idx)
+                # else
+                #     # TODO: this is a Learnable... add a node and connect it to this op
+                #     add_node!(block, numnodes, x, :learnable)
+                #     add_edge!(block, numnodes[], this_idx)
+                # end
+            elseif isa(x, Number)
+                _add_const_to_graph!(block, numnodes, x, this_idx)
 
-            # # the node just added is an input to the op
-            # if !(x in variables)
-            #     push!(node_indices, numnodes[])
-            # end
+            else
+                # this is another op... build it
+                add_item_to_graph!(block, input_idx, variables, numnodes, x, this_idx)
+            end
         end
 
-        # now add the op
-        # add_node!(block, numnodes, func, :operation)
-        # for idx in node_indices
-        #     add_edge!(block, idx, numnodes[])
-        # end
+        # now connect this op to its parent
+        add_edge!(block, this_idx, parent_idx)
+
+    elseif item.head == :line
+        # if it's a line number block, pass through to wrapped arg
+        # add_item_to_graph!(block, input_idx, variables, numnodes, item.args[1])
+        info("line")
 
     else
-        if item.head == :line
-            # if it's a line number block, pass through to wrapped arg
-            # add_item_to_graph!(block, input_idx, variables, numnodes, item.args[1])
-            info("line")
-        else
-            error("OpGraph parse error: $item")
-        end
-    end
-end
-
-function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Base.RefValue{Int}, item::Symbol, opidx)
-    @show "SYM",item input_idx variables numnodes[]
-    if item in variables
-        # TODO: this is a Variable... connect input node to this
-        # add_node!(block, numnodes, item, :variable)
-        add_edge!(block, _input_index, opidx)
-    else
-        # TODO: this is a Learnable
-        add_node!(block, numnodes, item, :learnable)
-        add_edge!(block, numnodes[], opidx)
+        error("OpGraph parse error: $item")
     end
     return
 end
+
+
+function _add_symbol_to_graph!(block, numnodes, x, parent_idx, variables)
+    if x in variables
+        # TODO: we should have multiple input nodes, one for each variable
+        # connect the input node to this op
+        add_edge!(block, _input_index, parent_idx)
+    else
+        # TODO: this is a Learnable... add a node and connect it to this op
+        add_node!(block, numnodes, x, :learnable)
+        add_edge!(block, numnodes[], parent_idx)
+    end
+end
+
+function _add_const_to_graph!(block, numnodes, x, parent_idx)
+    add_node!(block, numnodes, x, :constant)
+    add_edge!(block, numnodes[], parent_idx)
+end
+
+# function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Base.RefValue{Int}, item::Symbol, opidx)
+#     @show "SYM",item input_idx variables numnodes[]
+#     if item in variables
+#         # TODO: we should have multiple input nodes, one for each variable
+#         add_edge!(block, _input_index, opidx)
+#     else
+#         # TODO: this is a Learnable
+#         add_node!(block, numnodes, item, :learnable)
+#         add_edge!(block, numnodes[], opidx)
+#     end
+#     return opidx
+# end
 
 function add_node!(block::Expr, numnodes, node, nodetype::Symbol)
     nodesym = QuoteNode(node)
     nodeexpr = if nodetype == :learnable
         :(Learnable{1}($nodesym))
-    # elseif nodetype == :variable
-
+    elseif nodetype == :constant
+        :(Constant{1}($node))
     elseif nodetype == :operation
         :(op($nodesym, 1, 1))
     else
@@ -243,7 +299,7 @@ function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
         g = OpGraph{$I, $O}(
             AbstractTransformation[InputNode{$I}(), OutputNode{$O}()],
             NTuple{2,Int}[],
-            String["Input", "Output"]
+            UTF8String["Input", "Output"]
         )
     )))
     @show block
@@ -252,11 +308,14 @@ function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
     # graph_edges = []
     numnodes = Ref(2) # input and output
     for item in func_body.args
-        add_item_to_graph!(block, _input_index, variables, numnodes, item, 2)
+        opidx = add_item_to_graph!(block, _input_index, variables, numnodes, item, 2)
         
-        # connect this node to the output node, since it is returned from the function
-        add_edge!(block, numnodes[], _output_index)
+        # # connect this node to the output node, since it is returned from the function
+        # add_edge!(block, opidx, _output_index)
     end
+
+    # add this to the operators list
+    push!(_operators, func_name)
 
     push!(block.args, esc(:(g)))
     @show block
