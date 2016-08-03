@@ -123,10 +123,10 @@ immutable Affine{W<:AbstractMatrix, B<:AbstractVector} <: DemoTransform
     b::B
 end
 
-input_size(t::Affine)               = (size(t.w,2), size(t.b,2))
+input_size(t::Affine)               = (size(t.w,2),)
 output_size(t::Affine)              = size(t.b)
 
-transform!(y, t::Affine, x)         = (y[:] = x * t.w + t.b)
+transform!(y, t::Affine, x)         = (y[:] = t.w * x + t.b)
 
 # -------------------------------------------------------
 # Distributions are generating transformations
