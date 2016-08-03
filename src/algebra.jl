@@ -145,7 +145,7 @@ type OpGraph{I,O} <: AbstractTransformation{I,O}
 end
 
 
-op_type(g::OpGraph) = 
+# op_type(g::OpGraph) = 
 
 
 using PlotRecipes

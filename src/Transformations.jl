@@ -166,7 +166,8 @@ is_stochastic(::Distribution) = true
 # # TODO: should these be defined in LearnBase?
 # export invert, invert!, isinvertible
 
-include("algebra.jl")
+# include("algebra.jl")
+include("flow.jl")
 
 # include("common.jl")
 # include("static.jl")
