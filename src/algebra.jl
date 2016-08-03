@@ -8,6 +8,11 @@ export
     Constant,
     AbstractTransformation,
     op,
+    add_op,
+    UNARY,
+    BINARY,
+    ELEMENTWISE,
+    AGGREGATOR,
     @op
 
 """
@@ -28,55 +33,94 @@ some core traits:
     examples: sum, product
 """
 
+@enum OpType UNARY BINARY ELEMENTWISE AGGREGATOR
+
+
+const _op_types = Dict{Symbol, Tuple{Function,OpType}}(
+    :sigmoid => (x-> 1 ./ (1 .+ exp(-x)), UNARY),
+    :tanh    => (tanh, UNARY),
+    :*       => (*, BINARY),
+    :+       => (+, ELEMENTWISE),
+    :minimum => (minimum, AGGREGATOR),
+)
+
+op_function(s::Symbol) = _op_types[s][1]
+op_type(s::Symbol)     = _op_types[s][2]
+
+
+function add_op(s::Symbol, f::Function, t::OpType)
+    _op_types[s] = (f, t)
+end
+
+is_op(s::Symbol) = haskey(_op_types, s)
+
+# -------------------------------------------------------
+
 # wrap a function call (static transformation) and input/output dimensions in a type signature
-immutable Operator{F,I,O} <: AbstractTransformation{I,O}
+immutable Operator{OP,F,I,O} <: AbstractTransformation{I,O}
     f::Function
 end
 
 # convenience to instantiate an Operator
-op(f::Function, I::Int, O::Int) = Operator{Symbol(f), I, O}(f)
-op(f::Symbol, I::Int, O::Int) = Operator{f, I, O}(eval(f))
+op(f::Function, I::Int, O::Int) = Operator{op_type(Symbol(f)), Symbol(f), I, O}(f)
+op(s::Symbol, I::Int, O::Int) = Operator{op_type(s), s, I, O}(op_function(s))
 
-function Base.show{F,I,O}(io::IO, o::Operator{F,I,O})
-    print(io, "Op{$F, $I, $O")
-    for f in (:is_mappable, :is_operator, :is_element_operator)
-        print(io, ", $f=$(eval(f)(o))")
-    end
-    print(io, "}")
+(o::Operator)(args...) = (o.f)(args...)
+
+LearnBase.transform!(y, o::Operator{UNARY}, args...) = map!(o.f, y, args...)
+LearnBase.transform!(y, o::Operator{ELEMENTWISE}, args...) = map!(o.f, y, args...)
+LearnBase.transform!(y, o::Operator{BINARY}, args...) = y[:] = o.f(args...)
+LearnBase.transform!(y, o::Operator{AGGREGATOR}, args...) = y[:] = o.f(args...)
+
+function Base.show{OP,F,I,O}(io::IO, o::Operator{OP,F,I,O})
+    print(io, "Op{$OP, $F, $I, $O}")
 end
 
-const _mappables = [:sin, :exp, :log, :sigmoid, :tanh, :sqrt, :^]
-const _operators = [:*, :/, :\]
-const _element_ops = [:+, :-, :.*, :./, :max, :min, :.^]
-const _aggregators = [:sum, :product, :minimum, :maximum]
 
-function is_op(s::Symbol)
-    for v in (_mappables, _operators, _element_ops, _aggregators)
-        if s in v
-            return true
-        end
-    end
-    false
-end
+is_unary{OPTYPE}(o::Operator{OPTYPE})       = OPTYPE == UNARY
+is_binary{OPTYPE}(o::Operator{OPTYPE})      = OPTYPE == BINARY
+is_elementwise{OPTYPE}(o::Operator{OPTYPE}) = OPTYPE == ELEMENTWISE
+is_aggregator{OPTYPE}(o::Operator{OPTYPE})  = OPTYPE == AGGREGATOR
+
+
+# -------------------------------------------------------
+
+# const _mappables = [:sin, :exp, :log, :sigmoid, :tanh, :sqrt, :^]
+# const _operators = [:*, :/, :\]
+# const _element_ops = [:+, :-, :.*, :./, :max, :min, :.^]
+# const _aggregators = [:sum, :product, :minimum, :maximum]
+
+# function is_op(s::Symbol)
+#     for v in (_mappables, _operators, _element_ops, _aggregators)
+#         if s in v
+#             return true
+#         end
+#     end
+#     false
+# end
 # const _all_ops = vcat(_mappables, _operators, _element_ops, _aggregators)
 
-@generated function is_mappable{F,I,O}(o::Operator{F,I,O})
-    if F in _mappables
-        I==O || error("Mappables input and output dimensions should match")
-        :(true)
-    else
-        :(false)
-    end
-end
-@generated function is_operator{F,I,O}(o::Operator{F,I,O})
-    F in _operators ? :(true) : :(false)
-end
-@generated function is_element_operator{F,I,O}(o::Operator{F,I,O})
-    F in _element_ops ? :(true) : :(false)
-end
-@generated function is_aggregator{F,I,O}(o::Operator{F,I,O})
-    F in _aggregators ? :(true) : :(false)
-end
+# @generated function is_mappable{F,I,O}(o::Operator{F,I,O})
+#     if F in _mappables
+#         I==O || error("Mappables input and output dimensions should match")
+#         :(true)
+#     else
+#         :(false)
+#     end
+# end
+# @generated function is_operator{F,I,O}(o::Operator{F,I,O})
+#     F in _operators ? :(true) : :(false)
+# end
+# @generated function is_element_operator{F,I,O}(o::Operator{F,I,O})
+#     F in _element_ops ? :(true) : :(false)
+# end
+# @generated function is_aggregator{F,I,O}(o::Operator{F,I,O})
+#     F in _aggregators ? :(true) : :(false)
+# end
+
+# -------------------------------------------------------
+
+
 
 # -------------------------------------------------------
 
@@ -97,8 +141,12 @@ end
 type OpGraph{I,O} <: AbstractTransformation{I,O}
     nodes::Vector{AbstractTransformation}
     edges::Vector{NTuple{2,Int}}
-    names::Vector{UTF8String}
+    names::Vector{String}
 end
+
+
+op_type(g::OpGraph) = 
+
 
 using PlotRecipes
 @recipe function f(g::OpGraph)
@@ -110,14 +158,6 @@ using PlotRecipes
     names --> g.names
     func --> :tree
     root --> :left
-    # RecipesBase.apply_recipe(
-    #     d,
-    #     Int[e[1] for e=g.edges],
-    #     Int[e[2] for e=g.edges],
-    #     names = g.names,
-    #     func = :tree,
-    #     root = :left
-    # )
     PlotRecipes.GraphPlot((Int[e[1] for e=g.edges], Int[e[2] for e=g.edges]))
 end
 
@@ -167,7 +207,7 @@ const _output_index = 2
 
 function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Base.RefValue{Int}, item, parent_idx)
     @show "EXPR",item input_idx variables numnodes[]
-    dump(item, 20)
+    dump(item, maxdepth=20)
 
     if isa(item, Symbol)
         _add_symbol_to_graph!(block, numnodes, item, parent_idx, variables)
@@ -247,7 +287,7 @@ end
 # end
 
 function add_node!(block::Expr, numnodes, node, nodetype::Symbol)
-    nodesym = QuoteNode(node)
+    nodesym = quot(node)
     nodeexpr = if nodetype == :learnable
         :(Learnable{1}($nodesym))
     elseif nodetype == :constant
@@ -257,7 +297,6 @@ function add_node!(block::Expr, numnodes, node, nodetype::Symbol)
     else
         error("how do I add this node? $node $nodetype")
     end
-    # push!(block.args, esc(:(push!(g.nodes, ($(QuoteNode(node)), $(QuoteNode(nodetype)))))))
     push!(block.args, esc(:(push!(g.nodes, $nodeexpr))))
     push!(block.args, esc(:(push!(g.names, string($nodesym)))))
     numnodes[] += 1
@@ -268,7 +307,7 @@ function add_edge!(block::Expr, i::Int, j::Int)
 end
 
 function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
-    dump(funcexpr, 20)
+    dump(funcexpr; maxdepth=20)
     @show inout typeof(inout)
 
     func_signature, func_body = funcexpr.args
@@ -314,8 +353,9 @@ function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
         # add_edge!(block, opidx, _output_index)
     end
 
-    # add this to the operators list
-    push!(_operators, func_name)
+    # # add this to the operators list
+    # push!(_operators, func_name)
+    push!(block.args, esc(:(Transformations.add_op($(quot(func_name)), g, Transformations.op_type(g)))))
 
     push!(block.args, esc(:(g)))
     @show block

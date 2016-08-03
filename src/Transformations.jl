@@ -11,6 +11,8 @@ import Base: rand
 import LearnBase: transform, transform!, learn, learn!
 import StatsBase: logistic, logit
 
+using Base.Meta
+
 # # the "transformable trait"... I and O are the shapes (num dims) of the input and output
 # abstract TransformationType{I, O}
 #     immutable Transformable{I,O} <: TransformationType{I,O} end
