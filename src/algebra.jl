@@ -36,8 +36,9 @@ some core traits:
 @enum OpType UNARY BINARY ELEMENTWISE AGGREGATOR
 
 
+
 const _op_types = Dict{Symbol, Tuple{Function,OpType}}(
-    :sigmoid => (x-> 1 ./ (1 .+ exp(-x)), UNARY),
+    :sigmoid => (sigmoid, UNARY),
     :tanh    => (tanh, UNARY),
     :*       => (*, BINARY),
     :+       => (+, ELEMENTWISE),
