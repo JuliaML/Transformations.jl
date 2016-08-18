@@ -7,7 +7,7 @@ export
 function edges(v::DVertex, source = Int[], destiny = Int[], names = Symbol[], cache = Flow.ODict())
 	haskey(cache,v) && return source,destiny,names
 	cache[v] = length(cache) + 1
-	push!(names, v.value)
+	push!(names, string(v.value))
 	for v′ in inputs(v)
 		edges(v′, source, destiny, names, cache)
 		push!(source, cache[v′])
