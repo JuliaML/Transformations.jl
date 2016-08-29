@@ -1,4 +1,8 @@
 
+# ---------------------------------------------------------------------------
+# This is experimental, and currently unused
+# ---------------------------------------------------------------------------
+
 export
     Operator,
     OpGraph,
@@ -146,7 +150,7 @@ type OpGraph{I,O} <: AbstractTransformation{I,O}
 end
 
 
-# op_type(g::OpGraph) = 
+# op_type(g::OpGraph) =
 
 
 using PlotRecipes
@@ -214,7 +218,7 @@ function add_item_to_graph!(block::Expr, input_idx::Int, variables, numnodes::Ba
         _add_symbol_to_graph!(block, numnodes, item, parent_idx, variables)
     elseif isa(item, Number)
         _add_const_to_graph!(block, numnodes, item, parent_idx)
-    
+
     elseif item.head == :call && is_op(item.args[1])
         # node_indices = Int[]
         func = shift!(item.args)
@@ -349,7 +353,7 @@ function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
     numnodes = Ref(2) # input and output
     for item in func_body.args
         opidx = add_item_to_graph!(block, _input_index, variables, numnodes, item, 2)
-        
+
         # # connect this node to the output node, since it is returned from the function
         # add_edge!(block, opidx, _output_index)
     end
@@ -395,7 +399,7 @@ end
 
 # # @generated function transform!{T,F,I,O}(output::AbstractArray{T,O}, o::Operator{F,I,O}, input::AbstractArray{T,I})
 # #     @show T, F, O, I
-    
+
 # #     :(for (i,j) in zip(eachindex(output), eachindex(input))
 # #         output[i] = (o.f)(input[j])
 # #     end)
