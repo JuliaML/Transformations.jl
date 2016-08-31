@@ -8,8 +8,14 @@ using RecipesBase
 
 import CatViews: CatView
 import Base: rand
-import LearnBase: transform, transform!, learn, learn!
+import LearnBase: transform, transform!, grad, grad!, addgrad!
 import StatsBase: logistic, logit
+
+export
+    Node,
+    link_nodes!,
+    Affine,
+    Activation
 
 function zero!{T,N}(v::AbstractArray{T,N})
     for i in eachindex(v)
@@ -40,20 +46,31 @@ function link_nodes!{T,N}(outnode::Node{:output,T,N}, innode::Node{:input,T,N})
     innode.∇ = outnode.∇
 end
 
-# Most Transformations can share this.
+# ----------------------------------------------------------------
+
+# Most Transformations can share these methods as long as they have the required fields.
+
+
+# Copy input values into the input node, then transform
+function transform!(t::Transformation, input::AbstractVector)
+    copy!(t.input.val, input)
+    transform!(t)
+end
+
 # Copy the gradient into the output node, and propagate it back.
 function grad!(t::Transformation, ∇out::AbstractVector)
     copy!(t.output.∇, ∇out)
     grad!(t)
 end
 
-
-# Most Transformations can share this.
-# Copy input values into the input node, then transform
-function transform!(t::Transformation, input::AbstractVector)
-    copy!(t.input.val, input)
-    transform!(t)
+# update our params
+# TODO: handle learning rate better
+function addgrad!(t::Transformation, dθ::AbstractVector, η::Number)
+    for (i,j) in zip(eachindex(t.θ), eachindex(dθ))
+        t.θ[i] += η * dθ[j]
+    end
 end
+
 
 # ----------------------------------------------------------------
 
@@ -78,23 +95,24 @@ immutable Affine{T} <: Transformation
     output::Node{:output,T,1}
     θ::CatView{2,T}
     ∇θ::CatView{2,T}
+
+    function Affine(nin::Int, nout::Int)
+        input = Node(:input, zeros(T, nin))
+        w = Node(:param, zeros(T, nout, nin))
+        b = Node(:param, zeros(T, nout))
+        output = Node(:output, zeros(T, nout))
+        new(nin, nout, input, w, b, output, CatView(w.val, b.val), CatView(w.∇, b.∇))
+    end
 end
 
-function Affine{T}(::Type{T}, nin::Int, nout::Int)
-    input = Node(:input, zeros(T, nin)),
-    w = Node(:param, zeros(T, nout, nin)),
-    b = Node(:param, zeros(T, nin)),
-    output = Node(:output, zeros(T, nin))
-    Affine(nin, nout, input, w, b, output, CatView(w.val, b.val), CatView(w.∇, b.∇)))
-end
 
 Base.show(io::IO, t::Affine) = print(io, "Affine{$(t.nin)-->$(t.nout), input=$(t.input), w=$(t.w), b=$(t.b), output=$(t.output)}")
 
 # compute output = wx + b
 function transform!(aff::Affine)
     copy!(aff.output.val, aff.b.val)
-    for i=1:aff.nout
-        aff.output.val[i] += sum(aff.w.val[i,j] * input[j] for j=1:aff.nin)
+    for o=1:aff.nout
+        aff.output.val[o] += sum(aff.w.val[o,i] * aff.input.val[i] for i=1:aff.nin)
     end
     aff.output.val
 end
@@ -125,26 +143,46 @@ end
 grad(aff::Affine) = aff.∇θ
 
 
+
 # ----------------------------------------------------------------
 
 # TODO:
 #   - tests for Affine
-#   - implement some basic activations: sigmoid (logistic), tanh, relu
+#   - implement some basic activations: logistic (sigmoid), tanh, relu
 #   - simple Chainer to connect transformations (graphs can be later: general DAGs at first, then allow cycles)
 
 # general formula for elementwise activation: output = f(input)
-# some examples of f: sigmoid, tanh, relu, etc
+# some examples of f: logistic, tanh, relu, etc
 immutable Activation{F,T} <: Transformation
+    n::Int
     input::Node{:input,T,1}
     output::Node{:output,T,1}
+
+    # construct a new Activation, and link the nodes if it's the identity
+    # function Activation(fsym::Symbol, n::Int, T = Float64)
+    function Activation(n::Int)
+        input = Node(:input, zeros(T,n))
+        output = Node(:output, zeros(T,n))
+        if F == :identity
+            link_nodes!(output, input)
+        end
+        new(n, input, output)
+        # Activation{fsym,T}(input, output)
+    end
 end
 
-function transform!(f::Activation{:sigmoid})
-    # TODO
-end
 
-function grad!(f::Activation{:sigmoid})
-    # TODO
+# identity: nothing to do, since we linked the input to output
+transform!(f::Activation{:identity}) = f.output.val
+grad!(f::Activation{:identity}) = f.input.∇
+
+# logistic (sigmoid): f(x) = 1 ./ (1 .+ exp.(-x))
+logistic′{T<:Number}(x::T) = x * (one(T) - x)
+transform!(f::Activation{:logistic}) = map!(logistic, f.output.val, f.input.val)
+function grad!(f::Activation{:logistic})
+    for i=1:f.n
+        f.input.∇[i] = logistic′(f.output.val[i]) * f.output.∇[i]
+    end
 end
 
 # ----------------------------------------------------------------
