@@ -1,4 +1,13 @@
 
+# initial weightings for w
+function initial_weights{T}(::Type{T}, nin::Int, nout::Int, strat::Symbol = :default)
+    if strat == :default
+        (0.5 / sqrt(nin)) * randn(T, nout, nin)
+    else
+        error("Unknown strat in initial_weights: $strat")
+    end
+end
+
 # output = wx + b
 immutable Affine{T} <: Transformation
     nin::Int
@@ -12,7 +21,7 @@ immutable Affine{T} <: Transformation
 
     function Affine(nin::Int, nout::Int)
         input = Node(:input, zeros(T, nin))
-        w = Node(:param, zeros(T, nout, nin))
+        w = Node(:param, initial_weights(T, nin, nout))
         b = Node(:param, zeros(T, nout))
         output = Node(:output, zeros(T, nout))
         new(nin, nout, input, w, b, output, CatView(w.val, b.val), CatView(w.∇, b.∇))

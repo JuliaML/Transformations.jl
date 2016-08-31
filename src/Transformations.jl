@@ -15,7 +15,8 @@ export
     Node,
     link_nodes!,
     Affine,
-    Activation
+    Activation,
+    Chain
 
 function zero!{T,N}(v::AbstractArray{T,N})
     for i in eachindex(v)
@@ -23,6 +24,8 @@ function zero!{T,N}(v::AbstractArray{T,N})
     end
 end
 
+input_length(t::Transformation) = t.nin
+output_length(t::Transformation) = t.nout
 
 # notes:
 #   Transformations will be updated in a forward (transform) and backward (grad) pass.
@@ -76,6 +79,7 @@ end
 include("nodes.jl")
 include("affine.jl")
 include("activations.jl")
+include("chain.jl")
 
 # ----------------------------------------------------------------
 

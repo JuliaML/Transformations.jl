@@ -15,7 +15,7 @@ Base.show{TYPE}(io::IO, node::Node{TYPE}) = print(io, "$TYPE$(size(node.val))")
 # from the perspective of the computational graph, even though one is an output
 # of a transformation(s) and the other is the input to a transformation(s).
 # this reduces memory requirements and unnecessary copying
-function link_nodes!{T,N}(outnode::Node{:output,T,N}, innode::Node{:input,T,N})
+function link_nodes!{TYPE1,TYPE2,T,N}(outnode::Node{TYPE1,T,N}, innode::Node{TYPE2,T,N})
     innode.val = outnode.val
     innode.∇ = outnode.∇
 end

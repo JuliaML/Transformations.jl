@@ -49,8 +49,8 @@ let nin=2, nout=3, input=rand(nin), target=rand(nout)
     end
 end
 
-using Plots
-unicodeplots(size=(400,100))
+# using Plots
+# unicodeplots(size=(400,100))
 
 let n=2, input=rand(n)
     for s in Transformations.activations
@@ -62,9 +62,38 @@ let n=2, input=rand(n)
         @test f.input.∇ == map(@eval($(Symbol(s,"′"))), input)
 
         println()
-        plot(f, show=true)
+        # plot(f, show=true)
         @show s f input output f.output.∇ f.input.∇
     end
+end
+
+let n1=4, n2=3, n3=2, input=rand(4)
+    println()
+
+    T = Float64
+    chain = Chain(T,
+        Affine{T}(n1, n2),
+        Activation{:relu,T}(n2),
+        Affine{T}(n2, n3),
+        Activation{:logistic,T}(n3)
+    )
+    @show chain
+
+    @test length(chain.ts) == 4
+    @test chain.ts[1].input.val === chain.input.val
+    @test chain.ts[end].output.val === chain.output.val
+
+    # first compute the chain of transformations manually,
+    manual_output = input
+    for t in chain.ts
+        manual_output = transform!(t, manual_output)
+        @show t manual_output
+    end
+
+    # now do it using the chain, and make sure it matches
+    output = transform!(chain, input)
+    @show output
+    @test manual_output == output
 end
 
 # ## Basic ##

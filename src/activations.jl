@@ -1,6 +1,6 @@
 
-# general formula for elementwise activation: output = f(input)
-# some examples of f: logistic, tanh, relu, etc
+# general formula for elementwise activation: output = act(input)
+# some examples of act: logistic, tanh, relu, etc
 immutable Activation{F,T} <: Transformation
     n::Int
     # α::T  # scaling parameter for some activations
@@ -18,20 +18,25 @@ immutable Activation{F,T} <: Transformation
     end
 end
 
+Base.show{F,T}(io::IO, act::Activation{F,T}) = print(io, "$F($T, $(act.n))")
+
+input_length(act::Activation) = act.n
+output_length(act::Activation) = act.n
+
 # ----------------------------------------------------------------------------
 
 
 # identity: nothing to do, since we linked the input to output
-transform!(f::Activation{:identity}) = f.output.val
-grad!(f::Activation{:identity}) = f.input.∇
+transform!(act::Activation{:identity}) = act.output.val
+grad!(act::Activation{:identity}) = act.input.∇
 
-# for the following, compute the derivative f′(x), where y = f(x) is assumed precomputed
+# for the following, compute the derivative f′(x), where y = act(x) is assumed precomputed
 # ref: https://en.wikipedia.org/wiki/Activation_function
 
-# logistic (sigmoid): f(x) = 1 ./ (1 .+ exp.(-x))
+# logistic (sigmoid): act(x) = 1 ./ (1 .+ exp.(-x))
 logistic′{T<:Number}(x::T, y::T) = y * (one(T) - y)
 
-# tanh: f(x) = (eˣ .- e⁻ˣ) ./ (eˣ .+ e⁻ˣ)
+# tanh: act(x) = (eˣ .- e⁻ˣ) ./ (eˣ .+ e⁻ˣ)
 tanh′{T<:Number}(x::T, y::T) = one(T) - y^2
 
 softsign{T<:Number}(x::T) = x / (one(T) + abs(x))
@@ -65,45 +70,45 @@ const activations = [
     :gaussian,
 ]
 
-for f in activations
-    s = string(f)
+for act in activations
+    s = string(act)
     f′ = Symbol(s*"′")
 
     @eval begin
         # elementwise map from input to output
-        transform!(f::Activation{Symbol($s)}) = map!($f, f.output.val, f.input.val)
+        transform!(act::Activation{Symbol($s)}) = map!($act, act.output.val, act.input.val)
 
         # backprop gradient calc using specialized derivative
-        function grad!(f::Activation{Symbol($s)})
-            for i=1:f.n
-                f.input.∇[i] = $f′(f.input.val[i], f.output.val[i]) * f.output.∇[i]
+        function grad!(act::Activation{Symbol($s)})
+            for i=1:act.n
+                act.input.∇[i] = $f′(act.input.val[i], act.output.val[i]) * act.output.∇[i]
             end
             # no params, so nothing to return
         end
 
         # x-only version
         function $f′(x::Number)
-            y = $f(x)
+            y = $act(x)
             $f′(convert(typeof(y), x), y)
         end
 
-        value_func(f::Activation{Symbol($s)}) = $f
-        deriv_func(f::Activation{Symbol($s)}) = $f′
+        value_func(act::Activation{Symbol($s)}) = $act
+        deriv_func(act::Activation{Symbol($s)}) = $f′
 
         # export both functions
-        export $f, $f′
+        export $act, $f′
     end
 end
 
 
 # ----------------------------------------------------------------------------
 
-default_range(f::Activation) = linspace(-5,5)
+default_range(act::Activation) = linspace(-5,5)
 
 # user recipe adds a default x range
-@recipe f{F}(f::Activation{F}) = f, default_range(f)
+@recipe act{F}(act::Activation{F}) = act, default_range(act)
 
 # type recipe converts to a function of xi
-@recipe f{A<:Activation}(::Type{A}, f::A) = Transformations.value_func(f)
+@recipe act{A<:Activation}(::Type{A}, act::A) = Transformations.value_func(act)
 
 # ----------------------------------------------------------------------------
