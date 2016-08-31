@@ -37,15 +37,33 @@ let nin=2, nout=3, input=rand(nin), target=rand(nout)
         @test size(∇) == (length(a.w.∇) + length(a.b.∇),)
         @test size(∇w) == (length(a.w.∇),)
         @test size(∇b) == (length(a.b.∇),)
-        @test ∇w == vec(repmat(input', nout, 1) .* repmat(dl, 1, nin))
+        @test ∇w ≈ vec(repmat(input', nout, 1) .* repmat(dl, 1, nin))
         @test ∇b == dl
-        @test a.input.∇ == a.w.val' * dl
+        @test a.input.∇ ≈ a.w.val' * dl
 
         θ = copy(a.θ)
         addgrad!(a, ∇, 1e-2)
         @show a.θ
 
         @test a.θ == θ + 1e-2∇
+    end
+end
+
+using Plots
+unicodeplots(size=(400,100))
+
+let n=2, input=rand(n)
+    for s in Transformations.activations
+        f = Activation{s,Float64}(n)
+        output = transform!(f, input)
+        @test output == map(@eval($s), input)
+
+        grad!(f, ones(2))
+        @test f.input.∇ == map(@eval($(Symbol(s,"′"))), input)
+
+        println()
+        plot(f, show=true)
+        @show s f input output f.output.∇ f.input.∇
     end
 end
 
