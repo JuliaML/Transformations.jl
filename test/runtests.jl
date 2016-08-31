@@ -32,10 +32,14 @@ let nin=2, nout=3, input=rand(nin), target=rand(nout)
         ∇b = ∇[(nin*nout+1):end]
         @show ∇ a.w.∇ a.b.∇
 
+        @test a.output.∇ == dl
         @test isa(∇, Transformations.CatView)
         @test size(∇) == (length(a.w.∇) + length(a.b.∇),)
         @test size(∇w) == (length(a.w.∇),)
         @test size(∇b) == (length(a.b.∇),)
+        @test ∇w == vec(repmat(input', nout, 1) .* repmat(dl, 1, nin))
+        @test ∇b == dl
+        @test a.input.∇ == a.w.val' * dl
 
         θ = copy(a.θ)
         addgrad!(a, ∇, 1e-2)

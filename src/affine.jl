@@ -48,6 +48,6 @@ function grad!(aff::Affine)
     end
 
     # ∇b
-    copy!(aff.b.∇, aff.output.val)
+    copy!(aff.b.∇, aff.output.∇)
     return grad(aff)
 end
