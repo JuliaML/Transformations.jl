@@ -6,6 +6,7 @@ using Reexport
 @reexport using LearnBase
 using RecipesBase
 
+import CatViews: CatView
 import Base: rand
 import LearnBase: transform, transform!, learn, learn!
 import StatsBase: logistic, logit
@@ -18,35 +19,47 @@ end
 
 # ----------------------------------------------------------------
 
-# part of a subgraph
-immutable Node{TYPE,T}
-    val::T  # value
-    # δ::T  # sensitivity
-    ∇::T  # gradient
+# part of a subgraph, representing input, output, or learnable parameters
+type Node{TYPE,T,N}
+    val::Array{T,N}  # value
+    ∇::Array{T,N}  # gradient
 end
 
-function Node{T}(nodetype::Symbol, val::T) #, δ::T = zeros(val))
-    Node{nodetype, T}(val, zeros(val))
+function Node{T,N}(nodetype::Symbol, val::Array{T,N})
+    Node{nodetype,T,N}(val, zeros(val))
 end
 
 Base.show{TYPE}(io::IO, node::Node{TYPE}) = print(io, "$TYPE$(size(node.val))")
 
+# two nodes can be "linked together", which means that they are the "same node"
+# from the perspective of the computational graph, even though one is an output
+# of a transformation(s) and the other is the input to a transformation(s).
+# this reduces memory requirements and unnecessary copying
+function link_nodes!{T,N}(outnode::Node{:output,T,N}, innode::Node{:input,T,N})
+    innode.val = outnode.val
+    innode.∇ = outnode.∇
+end
+
+# ----------------------------------------------------------------
+
 # y = wx + b
-immutable Affine{V,M} <: Transformation
+type Affine{T} <: Transformation
     nin::Int
     nout::Int
-    x::Node{:input, V}
-    w::Node{:param, M}
-    b::Node{:param, V}
-    y::Node{:output, V}
+    x::Node{:input,T,1}
+    w::Node{:param,T,2}
+    b::Node{:param,T,1}
+    y::Node{:output,T,1}
+    θ::CatView{2,T}
+    ∇θ::CatView{2,T}
 end
 
 function Affine{T}(::Type{T}, nin::Int, nout::Int)
     x = Node(:input, zeros(T, nin)),
     w = Node(:param, zeros(T, nout, nin)),
-    b = Node(:param, zeros(T, nin)), #, ones(T, nin)), # sensitivity of b is constant
-    y = Node(:output, zeros(T, nin)) #, ones(T, nin))
-    Affine(nin,nout,x,w,b,y)
+    b = Node(:param, zeros(T, nin)),
+    y = Node(:output, zeros(T, nin))
+    Affine(nin, nout, x, w, b, y, CatView(w.val, b.val), CatView(w.∇, b.∇)))
 end
 
 Base.show(io::IO, t::Affine) = print(io, "Affine{$(t.nin)-->$(t.nout), x=$(t.x), w=$(t.w), b=$(t.b), y=$(t.y)}")
@@ -78,8 +91,12 @@ function grad!(aff::Affine)
 
     # ∇b
     copy!(aff.b.∇, aff.y.val)
-    return
+    return grad(aff)
 end
+
+# return a CatView of the param gradients
+grad(aff::Affine) = aff.∇θ
+
 
 # ----------------------------------------------------------------
 
