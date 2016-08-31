@@ -40,59 +40,86 @@ function link_nodes!{T,N}(outnode::Node{:output,T,N}, innode::Node{:input,T,N})
     innode.∇ = outnode.∇
 end
 
+# Most Transformations can share this.
+# Copy the gradient into the output node, and propagate it back.
+function grad!(t::Transformation, ∇out::AbstractVector)
+    copy!(t.output.∇, ∇out)
+    grad!(t)
+end
+
+
+# Most Transformations can share this.
+# Copy input values into the input node, then transform
+function transform!(t::Transformation, input::AbstractVector)
+    copy!(t.input.val, input)
+    transform!(t)
+end
+
 # ----------------------------------------------------------------
 
-# y = wx + b
-type Affine{T} <: Transformation
+# notes:
+#   Transformations will be updated in a forward (transform) and backward (grad) pass.
+#   The input nodes of a larger comp graph will be called with `transform!(t,input)` and all other
+#   nodes will be called with `transform!(t)`, assuming they are properly "linked" beforehand.
+#   This is because `output` is computed, which shares a reference to the arrays in the following
+#   Transformation's `input`, so it's ready to compute with `transform!`.
+
+#   The same happens in reverse.  An `input` node's `∇` is the same array as the child node's `output.∇`,
+#   so the gradients can flow backwards with one call to `grad!` in the proper (reverse) order.
+#   In this case, the
+
+# output = wx + b
+immutable Affine{T} <: Transformation
     nin::Int
     nout::Int
-    x::Node{:input,T,1}
+    input::Node{:input,T,1}
     w::Node{:param,T,2}
     b::Node{:param,T,1}
-    y::Node{:output,T,1}
+    output::Node{:output,T,1}
     θ::CatView{2,T}
     ∇θ::CatView{2,T}
 end
 
 function Affine{T}(::Type{T}, nin::Int, nout::Int)
-    x = Node(:input, zeros(T, nin)),
+    input = Node(:input, zeros(T, nin)),
     w = Node(:param, zeros(T, nout, nin)),
     b = Node(:param, zeros(T, nin)),
-    y = Node(:output, zeros(T, nin))
-    Affine(nin, nout, x, w, b, y, CatView(w.val, b.val), CatView(w.∇, b.∇)))
+    output = Node(:output, zeros(T, nin))
+    Affine(nin, nout, input, w, b, output, CatView(w.val, b.val), CatView(w.∇, b.∇)))
 end
 
-Base.show(io::IO, t::Affine) = print(io, "Affine{$(t.nin)-->$(t.nout), x=$(t.x), w=$(t.w), b=$(t.b), y=$(t.y)}")
+Base.show(io::IO, t::Affine) = print(io, "Affine{$(t.nin)-->$(t.nout), input=$(t.input), w=$(t.w), b=$(t.b), output=$(t.output)}")
 
-# copy x and compute y
-function transform!(aff::Affine, x::AbstractVector)
-    copy!(aff.x.val, x)
-    copy!(aff.y.val, aff.b.val)
+# compute output = wx + b
+function transform!(aff::Affine)
+    copy!(aff.output.val, aff.b.val)
     for i=1:aff.nout
-        aff.y.val[i] += sum(aff.w.val[i,j] * x[j] for j=1:aff.nin)
+        aff.output.val[i] += sum(aff.w.val[i,j] * input[j] for j=1:aff.nin)
     end
+    aff.output.val
 end
 
 # update the partial derivatives:
 #   ∇x = ∂L/∂x
 #   ∇w = ∂L/∂w
 #   ∇b = ∂L/∂b
-# use the chain rule, assuming that we've already updated ∇y = ∂L/∂y
+# use the chain rule, assuming that we've already updated ∇out = ∂L/∂y
 function grad!(aff::Affine)
     # ∇x, ∇w
     for i=1:aff.nin
-        ∇xᵢ = zero(eltype(aff.x.∇))
+        ∇xᵢ = zero(eltype(aff.input.∇))
         for o=1:aff.nout
-            ∇xᵢ += aff.w.val[o,i] * aff.y.∇[o]
-            aff.w.∇[o,i] = aff.x.val[i] * aff.y.∇[o]
+            ∇xᵢ += aff.w.val[o,i] * aff.output.∇[o]
+            aff.w.∇[o,i] = aff.input.val[i] * aff.output.∇[o]
         end
-        aff.x.∇[i] = ∇xᵢ
+        aff.input.∇[i] = ∇xᵢ
     end
 
     # ∇b
-    copy!(aff.b.∇, aff.y.val)
+    copy!(aff.b.∇, aff.output.val)
     return grad(aff)
 end
+
 
 # return a CatView of the param gradients
 grad(aff::Affine) = aff.∇θ
@@ -105,6 +132,20 @@ grad(aff::Affine) = aff.∇θ
 #   - implement some basic activations: sigmoid (logistic), tanh, relu
 #   - simple Chainer to connect transformations (graphs can be later: general DAGs at first, then allow cycles)
 
+# general formula for elementwise activation: output = f(input)
+# some examples of f: sigmoid, tanh, relu, etc
+immutable Activation{F,T} <: Transformation
+    input::Node{:input,T,1}
+    output::Node{:output,T,1}
+end
+
+function transform!(f::Activation{:sigmoid})
+    # TODO
+end
+
+function grad!(f::Activation{:sigmoid})
+    # TODO
+end
 
 # ----------------------------------------------------------------
 
@@ -114,9 +155,9 @@ grad(aff::Affine) = aff.∇θ
 #     output_shape
 
 # #
-# function transform(t::Transformation, x)
-#     y = Array(eltype(x), output_shape(t, x))
-#     transform!(y, tfm, x)
+# function transform(t::Transformation, input)
+#     output = Array(eltype(input), output_shape(t, input))
+#     transform!(output, tfm, input)
 # end
 #
 # "For a Transformation t, the dimensions of the output"
