@@ -39,9 +39,8 @@ output_length(t::Transformation) = t.nout
 #   In this case, the
 
 # TODO:
-#   - implement some basic activations: logistic (sigmoid), tanh, relu
-#   - simple Chainer to connect transformations (graphs can be later: general DAGs at first, then allow cycles)
-
+#   - DAGs of Transformations
+#   - Then handle cycles
 
 # ----------------------------------------------------------------
 
