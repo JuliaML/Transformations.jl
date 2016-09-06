@@ -11,6 +11,10 @@ end
 
 Base.show{TYPE}(io::IO, node::Node{TYPE}) = print(io, "$TYPE$(size(node.val))")
 
+Base.length(node::Node) = length(value(node))
+value(node::Node) = node.val
+grad(node::Node) = node.∇
+
 # two nodes can be "linked together", which means that they are the "same node"
 # from the perspective of the computational graph, even though one is an output
 # of a transformation(s) and the other is the input to a transformation(s).

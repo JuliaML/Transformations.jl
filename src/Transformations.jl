@@ -8,10 +8,20 @@ using RecipesBase
 
 import CatViews: CatView
 import Base: rand
-import LearnBase: transform, transform!, grad, grad!, addgrad!
+import LearnBase: transform, transform!, grad, grad!, addgrad!, value
 import StatsBase: logistic, logit
 
 export
+    input_node,
+    output_node,
+    input_length,
+    output_length,
+    input_value,
+    output_value,
+    input_grad,
+    output_grad,
+    params,
+
     Node,
     link_nodes!,
     Affine,
@@ -24,8 +34,17 @@ function zero!{T,N}(v::AbstractArray{T,N})
     end
 end
 
-input_length(t::Transformation) = t.nin
-output_length(t::Transformation) = t.nout
+input_node(t::Transformation) = t.input
+output_node(t::Transformation) = t.output
+input_length(t::Transformation) = length(input_node(t))
+output_length(t::Transformation) = length(output_node(t))
+input_value(t::Transformation) = value(input_node(t))
+output_value(t::Transformation) = value(output_node(t))
+input_grad(t::Transformation) = grad(input_node(t))
+output_grad(t::Transformation) = grad(output_node(t))
+
+# return a view of the parameter vector... may be a CatView
+function params end
 
 # notes:
 #   Transformations will be updated in a forward (transform) and backward (grad) pass.
@@ -49,14 +68,19 @@ output_length(t::Transformation) = t.nout
 
 # Copy input values into the input node, then transform
 function transform!(t::Transformation, input::AbstractVector)
-    copy!(t.input.val, input)
+    copy!(input_value(t), input)
     transform!(t)
 end
 
 # Copy the gradient into the output node, and propagate it back.
 function grad!(t::Transformation, ∇out::AbstractVector)
-    copy!(t.output.∇, ∇out)
+    copy!(output_grad(t), ∇out)
     grad!(t)
+end
+
+# return a CatView of the params
+function params(t::Transformation)
+    t.θ
 end
 
 # return a CatView of the param gradients
@@ -64,13 +88,13 @@ function grad(t::Transformation)
     t.∇θ
 end
 
-# update our params
-# TODO: handle learning rate better
-function addgrad!(t::Transformation, dθ::AbstractVector, η::Number)
-    for (i,j) in zip(eachindex(t.θ), eachindex(dθ))
-        t.θ[i] += η * dθ[j]
-    end
-end
+# # update our params
+# # TODO: handle learning rate better
+# function addgrad!(t::Transformation, dθ::AbstractVector, η::Number)
+#     for (i,j) in zip(eachindex(t.θ), eachindex(dθ))
+#         t.θ[i] += η * dθ[j]
+#     end
+# end
 
 
 # ----------------------------------------------------------------
