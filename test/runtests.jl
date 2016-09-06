@@ -41,11 +41,11 @@ let nin=2, nout=3, input=rand(nin), target=rand(nout)
         @test ∇b == dl
         @test a.input.∇ ≈ a.w.val' * dl
 
-        θ = copy(a.θ)
-        addgrad!(a, ∇, 1e-2)
-        @show a.θ
-
-        @test a.θ == θ + 1e-2∇
+        # θ = copy(a.θ)
+        # addgrad!(a, ∇, 1e-2)
+        # @show a.θ
+        #
+        # @test a.θ == θ + 1e-2∇
     end
 end
 
