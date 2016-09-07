@@ -20,7 +20,6 @@ grad(node::Node) = node.∇
 # of a transformation(s) and the other is the input to a transformation(s).
 # this reduces memory requirements and unnecessary copying
 function link_nodes!{TYPE1,TYPE2,T,N}(outnode::Node{TYPE1,T,N}, innode::Node{TYPE2,T,N})
-    @assert length(outnode) == length(innode)
     innode.val = outnode.val
     innode.∇ = outnode.∇
 end
