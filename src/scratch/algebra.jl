@@ -343,7 +343,7 @@ function _op_macro(funcexpr::Expr, inout::NTuple{2,Int} = (1,1))
         g = OpGraph{$I, $O}(
             AbstractTransformation[InputNode{$I}(), OutputNode{$O}()],
             NTuple{2,Int}[],
-            UTF8String["Input", "Output"]
+            String["Input", "Output"]
         )
     )))
     @show block
