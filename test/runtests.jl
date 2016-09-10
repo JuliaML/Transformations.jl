@@ -7,8 +7,12 @@ using Losses
 
 @testset "Affine" begin
     let nin=2, nout=3, input=rand(nin), target=rand(nout)
-        a = Affine{Float64}(nin, nout)
+        a = Affine(nin, nout)
         loss = L2DistLoss()
+        w, b = a.params.views
+        x, y = input_value(a), output_value(a)
+        ∇w, ∇b = a.params.∇_views
+        ∇x, ∇y = input_grad(a), output_grad(a)
         # @show a loss
 
         for i=1:2
@@ -17,30 +21,30 @@ using Losses
             output = transform!(a, input)
             # @show i output
 
-            @test output == a.w.val * input + a.b.val
-            @test size(a.input.val) == (nin,)
-            @test size(a.w.val) == (nout,nin)
-            @test size(a.b.val) == (nout,)
-            @test size(a.output.val) == (nout,)
+            @test y == w * x + b
+            @test size(x) == (nin,)
+            @test size(w) == (nout,nin)
+            @test size(b) == (nout,)
+            @test size(y) == (nout,)
             @test size(output) == (nout,)
 
             l = value(loss, target, output)
             dl = deriv(loss, target, output)
             # @show l dl
 
-            ∇ = grad!(a, dl)
-            ∇w = ∇[1:(nin*nout)]
-            ∇b = ∇[(nin*nout+1):end]
+            grad!(a, dl)
+            # ∇w = ∇[1:(nin*nout)]
+            # ∇b = ∇[(nin*nout+1):end]
             # @show ∇ a.w.∇ a.b.∇
 
-            @test a.output.∇ == dl
-            @test isa(∇, Transformations.CatView)
-            @test size(∇) == (length(a.w.∇) + length(a.b.∇),)
-            @test size(∇w) == (length(a.w.∇),)
-            @test size(∇b) == (length(a.b.∇),)
+            @test grad(a.output) == dl
+            # @test isa(∇, Transformations.CatView)
+            # @test size(∇) == (length(a.w.∇) + length(a.b.∇),)
+            @test size(∇w) == (length(w),)
+            @test size(∇b) == (length(b),)
             @test ∇w ≈ vec(repmat(input', nout, 1) .* repmat(dl, 1, nin))
             @test ∇b == dl
-            @test a.input.∇ ≈ a.w.val' * dl
+            @test ∇x ≈ w' * dl
 
             # θ = copy(a.θ)
             # addgrad!(a, ∇, 1e-2)

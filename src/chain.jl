@@ -3,12 +3,15 @@
 # One could represent an ANN like:
 #   affine(n1,n2) --> relu(n2) --> affine(n2,n3) --> logistic(n3)
 # The output of a chain could be fed into a loss model for backprop
-type Chain{T} <: Transformation
+type Chain{T} <: Learnable
     nin::Int
     nout::Int
     input::Node{:input,T}
     output::Node{:output,T}
     ts::Vector{Transformation}
+    params::Params
+    # Θ::Vector{T}
+    # ∇Θ::Vector{T}
 
     function Chain(nin::Int, nout::Int)
         input = Node(:input, zeros(T, nin))
@@ -23,6 +26,19 @@ function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
     for t in ts
         push!(chain, t)
     end
+    lens = map(t -> params_length(t), chain.ts)
+    nparams = sum(lens)
+    Θ = zeros(T, nparams)
+    ∇Θ = zeros(T, nparams)
+    sizes = map(l -> (l,), lens)
+    Θs = splitview(Θ, sizes)
+    ∇s = splitview(∇Θ, sizes)
+    for (i,t) in chain.ts
+        if params_length(t) > 0
+            reset!(chain.ts.params, Θs[i], ∇s[i])
+        end
+    end
+    chain.params = Params(Θ, ∇Θ)
     chain
 end
 

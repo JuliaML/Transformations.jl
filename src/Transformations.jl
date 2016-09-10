@@ -6,7 +6,7 @@ using Reexport
 @reexport using LearnBase
 using RecipesBase
 
-import CatViews: CatView
+import CatViews: CatView, splitview
 import Base: rand
 import LearnBase: transform, transform!, grad, grad!, addgrad!, value
 import StatsBase: logistic, logit
@@ -43,8 +43,22 @@ output_value(t::Transformation) = value(output_node(t))
 input_grad(t::Transformation) = grad(input_node(t))
 output_grad(t::Transformation) = grad(output_node(t))
 
-# return a view of the parameter vector... may be a CatView
-function params end
+# # return a view of the parameter vector... may be a CatView/SplitView
+# function params end
+
+abstract Learnable <: Transformation
+
+"The length of the parameter vector"
+params_length(t::Transformation) = 0
+params_length(t::Learnable) = length(params(t))
+
+"Learnable parameter values"
+params(t::Transformation) = zeros(0)
+params(t::Learnable) = value(t.params)
+
+"Gradients of the learnable parameters"
+grad(t::Transformation) = zeros(0)
+grad(t::Learnable) = grad(t.params)
 
 # notes:
 #   Transformations will be updated in a forward (transform) and backward (grad) pass.
@@ -78,15 +92,16 @@ function grad!(t::Transformation, ∇out::AbstractVector)
     grad!(t)
 end
 
-# return a CatView of the params
-function params(t::Transformation)
-    t.θ
-end
 
-# return a CatView of the param gradients
-function grad(t::Transformation)
-    t.∇θ
-end
+# # return a CatView of the params
+# function params(t::Transformation)
+#     t.θ
+# end
+#
+# # return a CatView of the param gradients
+# function grad(t::Transformation)
+#     t.∇θ
+# end
 
 # # update our params
 # # TODO: handle learning rate better
@@ -99,6 +114,7 @@ end
 
 # ----------------------------------------------------------------
 
+include("params.jl")
 include("nodes.jl")
 include("affine.jl")
 include("activations.jl")

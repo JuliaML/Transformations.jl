@@ -1,4 +1,6 @@
 
+
+
 # general formula for elementwise activation: output = act(input)
 # some examples of act: logistic, tanh, relu, etc
 immutable Activation{F,T} <: Transformation
@@ -22,6 +24,10 @@ Base.show{F,T}(io::IO, act::Activation{F,T}) = print(io, "$F($T, $(act.n))")
 
 input_length(act::Activation) = act.n
 output_length(act::Activation) = act.n
+
+# params_length(act::Activation) = 0
+# params{F,T}(act::Activation{F,T}) = zeros(T,0)
+# grad{F,T}(act::Activation{F,T}) = zeros(T,0)
 
 # ----------------------------------------------------------------------------
 
@@ -83,7 +89,6 @@ for act in activations
             for i=1:act.n
                 act.input.∇[i] = $f′(act.input.val[i], act.output.val[i]) * act.output.∇[i]
             end
-            # no params, so nothing to return
         end
 
         # x-only version

@@ -8,36 +8,68 @@ function initial_weights{T}(::Type{T}, nin::Int, nout::Int, strat::Symbol = :def
     end
 end
 
-# output = wx + b
-immutable Affine{T} <: Transformation
-    nin::Int
-    nout::Int
-    input::Node{:input,T,1}
-    w::Node{:param,T,2}
-    b::Node{:param,T,1}
-    output::Node{:output,T,1}
-    θ::CatView{2,T}
-    ∇θ::CatView{2,T}
-
-    function Affine(nin::Int, nout::Int)
-        input = Node(:input, zeros(T, nin))
-        w = Node(:param, initial_weights(T, nin, nout))
-        b = Node(:param, zeros(T, nout))
-        output = Node(:output, zeros(T, nout))
-        new(nin, nout, input, w, b, output, CatView(w.val, b.val), CatView(w.∇, b.∇))
+function initialize_weights!{T}(w::AbstractArray{T})
+    nin, nout = size(w)
+    scalar = T(0.5 / sqrt(nin))
+    for i in eachindex(w)
+        w[i] = scalar * randn(T)
     end
 end
 
+function initialize_bias!{T}(b::AbstractArray{T})
+    fill!(b, zero(T))
+end
 
-Base.show(io::IO, t::Affine) = print(io, "Affine{$(t.nin)-->$(t.nout), input=$(t.input), w=$(t.w), b=$(t.b), output=$(t.output)}")
+# output = wx + b
+immutable Affine{T} <: Learnable
+    nin::Int
+    nout::Int
+    input::Node{:input,T,1}
+    # w::Node{:param,T,2}
+    # b::Node{:param,T,1}
+    output::Node{:output,T,1}
+    # θ::CatView{2,T}
+    # ∇θ::CatView{2,T}
+    params::Params
+
+    function Affine(nin::Int, nout::Int,
+                    Θ::AbstractVector = zeros(T, nout*(nin+1)),
+                    ∇::AbstractVector = zeros(T, nout*(nin+1)))
+        input = Node(:input, zeros(T, nin))
+        # w = Node(:param, initial_weights(T, nin, nout))
+        # b = Node(:param, zeros(T, nout))
+        output = Node(:output, zeros(T, nout))
+        params = Params(Θ, ∇, ((nout,nin), (nout,)))
+        w, b = params.views
+        initialize_weights!(w)
+        initialize_bias!(b)
+        # new(nin, nout, input, w, b, output, CatView(w.val, b.val), CatView(w.∇, b.∇))
+        new(nin, nout, input, output, params)
+    end
+end
+
+Affine{T}(::Type{T}, nin::Int, nout::Int, args...) = Affine{T}(nin, nout, args...)
+Affine(nin::Int, nout::Int, args...) = Affine{Float64}(nin, nout, args...)
+
+# Base.show(io::IO, t::Affine) = print(io, "Affine{$(t.nin)-->$(t.nout), input=$(t.input), w=$(t.w), b=$(t.b), output=$(t.output)}")
+function Base.show(io::IO, t::Affine)
+    print(io, "Affine{$(t.nin)-->$(t.nout), input=$(t.input), output=$(t.output)}")
+end
+
+params_length(aff::Affine) = length(aff.params.Θ)
+params(aff::Affine) = aff.params.Θ
+grad(aff::Affine) = aff.params.∇Θ
 
 # compute output = wx + b
 function transform!(aff::Affine)
-    copy!(aff.output.val, aff.b.val)
+    w, b = t.params.views
+    x = aff.input.val
+    y = aff.output.val
+    copy!(y, b)
     for o=1:aff.nout
-        aff.output.val[o] += sum(aff.w.val[o,i] * aff.input.val[i] for i=1:aff.nin)
+        y[o] += sum(w[o,i] * x[i] for i=1:aff.nin)
     end
-    aff.output.val
+    y
 end
 
 # update the partial derivatives:
@@ -46,17 +78,23 @@ end
 #   ∇b = ∂L/∂b
 # use the chain rule, assuming that we've already updated ∇out = ∂L/∂y
 function grad!(aff::Affine)
+    w, b = t.params.views
+    ∇w, ∇b = t.params.∇_views
+    x = aff.input.val
+    ∇x = aff.input.∇
+    ∇y = aff.output.∇
+
     # ∇x, ∇w
     for i=1:aff.nin
-        ∇xᵢ = zero(eltype(aff.input.∇))
+        ∇xᵢ = zero(eltype(∇x))
         for o=1:aff.nout
-            ∇xᵢ += aff.w.val[o,i] * aff.output.∇[o]
-            aff.w.∇[o,i] = aff.input.val[i] * aff.output.∇[o]
+            ∇xᵢ += w[o,i] * ∇y[o]
+            ∇w[o,i] = x[i] * ∇y[o]
         end
-        aff.input.∇[i] = ∇xᵢ
+        ∇x[i] = ∇xᵢ
     end
 
     # ∇b
-    copy!(aff.b.∇, aff.output.∇)
-    return grad(aff)
+    copy!(∇b, ∇y)
+    return
 end
