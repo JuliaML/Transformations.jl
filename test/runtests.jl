@@ -13,6 +13,7 @@ using Losses
         x, y = input_value(a), output_value(a)
         ∇w, ∇b = a.params.∇_views
         ∇x, ∇y = input_grad(a), output_grad(a)
+        nparams = nout*(nin+1)
         # @show a loss
 
         for i=1:2
@@ -26,7 +27,13 @@ using Losses
             @test size(w) == (nout,nin)
             @test size(b) == (nout,)
             @test size(y) == (nout,)
+            @test size(∇x) == (nin,)
+            @test size(∇w) == (nout,nin)
+            @test size(∇b) == (nout,)
+            @test size(∇y) == (nout,)
             @test size(output) == (nout,)
+            @test size(params(a)) == (nparams,)
+            @test size(grad(a)) == (nparams,)
 
             l = value(loss, target, output)
             dl = deriv(loss, target, output)
@@ -40,9 +47,7 @@ using Losses
             @test grad(a.output) == dl
             # @test isa(∇, Transformations.CatView)
             # @test size(∇) == (length(a.w.∇) + length(a.b.∇),)
-            @test size(∇w) == (length(w),)
-            @test size(∇b) == (length(b),)
-            @test ∇w ≈ vec(repmat(input', nout, 1) .* repmat(dl, 1, nin))
+            @test ∇w ≈ repmat(input', nout, 1) .* repmat(dl, 1, nin)
             @test ∇b == dl
             @test ∇x ≈ w' * dl
 

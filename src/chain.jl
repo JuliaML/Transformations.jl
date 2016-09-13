@@ -26,16 +26,16 @@ function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
     for t in ts
         push!(chain, t)
     end
-    lens = map(t -> params_length(t), chain.ts)
+    lens = ntuple(i -> params_length(chain.ts[i]), length(ts)+1)
     nparams = sum(lens)
     Θ = zeros(T, nparams)
     ∇Θ = zeros(T, nparams)
     sizes = map(l -> (l,), lens)
-    Θs = splitview(Θ, sizes)
-    ∇s = splitview(∇Θ, sizes)
-    for (i,t) in chain.ts
+    Θs = splitview(Θ, sizes)[1]
+    ∇s = splitview(∇Θ, sizes)[1]
+    for (i,t) in enumerate(chain.ts)
         if params_length(t) > 0
-            reset!(chain.ts.params, Θs[i], ∇s[i])
+            reset!(t.params, Θs[i], ∇s[i])
         end
     end
     chain.params = Params(Θ, ∇Θ)

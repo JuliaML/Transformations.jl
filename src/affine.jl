@@ -51,18 +51,18 @@ end
 Affine{T}(::Type{T}, nin::Int, nout::Int, args...) = Affine{T}(nin, nout, args...)
 Affine(nin::Int, nout::Int, args...) = Affine{Float64}(nin, nout, args...)
 
-# Base.show(io::IO, t::Affine) = print(io, "Affine{$(t.nin)-->$(t.nout), input=$(t.input), w=$(t.w), b=$(t.b), output=$(t.output)}")
+# Base.show(io::IO, aff::Affine) = print(io, "Affine{$(aff.nin)-->$(aff.nout), input=$(aff.input), w=$(aff.w), b=$(aff.b), output=$(t.output)}")
 function Base.show(io::IO, t::Affine)
     print(io, "Affine{$(t.nin)-->$(t.nout), input=$(t.input), output=$(t.output)}")
 end
 
 params_length(aff::Affine) = length(aff.params.Θ)
 params(aff::Affine) = aff.params.Θ
-grad(aff::Affine) = aff.params.∇Θ
+grad(aff::Affine) = aff.params.∇
 
 # compute output = wx + b
 function transform!(aff::Affine)
-    w, b = t.params.views
+    w, b = aff.params.views
     x = aff.input.val
     y = aff.output.val
     copy!(y, b)
@@ -78,8 +78,8 @@ end
 #   ∇b = ∂L/∂b
 # use the chain rule, assuming that we've already updated ∇out = ∂L/∂y
 function grad!(aff::Affine)
-    w, b = t.params.views
-    ∇w, ∇b = t.params.∇_views
+    w, b = aff.params.views
+    ∇w, ∇b = aff.params.∇_views
     x = aff.input.val
     ∇x = aff.input.∇
     ∇y = aff.output.∇

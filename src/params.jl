@@ -24,7 +24,7 @@ Solution?  Store anonymous functions which return views of Θ(t),
 By default we can do `view(zeros(T, params_length(t)), :)`, then swap
 out with a master param vector on update.
 """
-type Params{T <: SubArray, VIEWS <: Tuple, S <: Tuple} <: LearnableParams
+type Params{T <: AbstractVector, VIEWS <: Tuple, S <: Tuple} <: LearnableParams
     Θ::T
     ∇::T
     views::VIEWS
@@ -33,16 +33,16 @@ type Params{T <: SubArray, VIEWS <: Tuple, S <: Tuple} <: LearnableParams
 end
 
 function Params(Θ::AbstractVector, ∇::AbstractVector, sizes = ())
-    views = splitview(Θ, sizes)
-    ∇_views = splitview(∇, sizes)
+    views = splitview(Θ, sizes)[1]
+    ∇_views = splitview(∇, sizes)[1]
     Params(Θ, ∇, views, ∇_views, sizes)
 end
 
 function reset!(p::Params, Θ::AbstractVector, ∇::AbstractVector)
     p.Θ = Θ
     p.∇ = ∇
-    p.views = splitview(p.Θ, p.sizes)
-    p.∇_views = splitview(p.∇, p.sizes)
+    p.views = splitview(p.Θ, p.sizes)[1]
+    p.∇_views = splitview(p.∇, p.sizes)[1]
     return
 end
 
