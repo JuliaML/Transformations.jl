@@ -10,8 +10,6 @@ type Chain{T} <: Learnable
     output::Node{:output,T}
     ts::Vector{Transformation}
     params::Params
-    # Θ::Vector{T}
-    # ∇Θ::Vector{T}
 
     function Chain(nin::Int, nout::Int)
         input = Node(:input, zeros(T, nin))
@@ -19,6 +17,7 @@ type Chain{T} <: Learnable
         new(nin, nout, input, output, Transformation[])
     end
 end
+Chain(ts::Transformation...) = Chain(Float64, ts...)
 
 function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
     chain = Chain{T}(input_length(t1), output_length(isempty(ts) ? t1 : ts[end]))
@@ -28,17 +27,20 @@ function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
     end
     lens = ntuple(i -> params_length(chain.ts[i]), length(ts)+1)
     nparams = sum(lens)
-    Θ = zeros(T, nparams)
-    ∇Θ = zeros(T, nparams)
+    θ = zeros(T, nparams)
+    ∇θ = zeros(T, nparams)
     sizes = map(l -> (l,), lens)
-    Θs = splitview(Θ, sizes)[1]
-    ∇s = splitview(∇Θ, sizes)[1]
+    θs = splitview(θ, sizes)[1]
+    ∇s = splitview(∇θ, sizes)[1]
     for (i,t) in enumerate(chain.ts)
         if params_length(t) > 0
-            reset!(t.params, Θs[i], ∇s[i])
+            # first update the values of the new array, then reset the params with this reference
+            θs[i][:] = t.params.θ
+            ∇s[i][:] = t.params.∇
+            reset!(t.params, θs[i], ∇s[i])
         end
     end
-    chain.params = Params(Θ, ∇Θ)
+    chain.params = Params(θ, ∇θ)
     chain
 end
 

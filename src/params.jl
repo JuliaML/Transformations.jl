@@ -10,14 +10,14 @@ We need a wrapper for params that can hold:
 
 so for t::Transformation:
 
-Θ(t) --> SubArray
-t.w, t.b --> view(Θ)
+θ(t) --> SubArray
+t.w, t.b --> view(θ)
 
 Problem: every time we change the "master parameter vector"
 we need to update the views (but... do we?? gotta check if
     just appending to the master params will invalidate the views)
 
-Solution?  Store anonymous functions which return views of Θ(t),
+Solution?  Store anonymous functions which return views of θ(t),
     and update w/b by calling those functions.
 
 
@@ -25,28 +25,28 @@ By default we can do `view(zeros(T, params_length(t)), :)`, then swap
 out with a master param vector on update.
 """
 type Params{T <: AbstractVector, VIEWS <: Tuple, S <: Tuple} <: LearnableParams
-    Θ::T
+    θ::T
     ∇::T
     views::VIEWS
     ∇_views::VIEWS
     sizes::S
 end
 
-function Params(Θ::AbstractVector, ∇::AbstractVector, sizes = ())
-    views = splitview(Θ, sizes)[1]
+function Params(θ::AbstractVector, ∇::AbstractVector, sizes = ())
+    views = splitview(θ, sizes)[1]
     ∇_views = splitview(∇, sizes)[1]
-    Params(Θ, ∇, views, ∇_views, sizes)
+    Params(θ, ∇, views, ∇_views, sizes)
 end
 
-function reset!(p::Params, Θ::AbstractVector, ∇::AbstractVector)
-    p.Θ = Θ
+function reset!(p::Params, θ::AbstractVector, ∇::AbstractVector)
+    p.θ = θ
     p.∇ = ∇
-    p.views = splitview(p.Θ, p.sizes)[1]
+    p.views = splitview(p.θ, p.sizes)[1]
     p.∇_views = splitview(p.∇, p.sizes)[1]
     return
 end
 
 Base.getindex(p::Params, i::Int) = p.views[i]
 
-value(p::Params) = p.Θ
+value(p::Params) = p.θ
 grad(p::Params) = p.∇

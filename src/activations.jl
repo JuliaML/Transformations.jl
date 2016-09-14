@@ -19,6 +19,7 @@ immutable Activation{F,T} <: Transformation
         new(n, input, output)
     end
 end
+Activation(s::Symbol, n::Int) = Activation{s,Float64}(n)
 
 Base.show{F,T}(io::IO, act::Activation{F,T}) = print(io, "$F($T, $(act.n))")
 
@@ -105,6 +106,26 @@ for act in activations
     end
 end
 
+
+# ----------------------------------------------------------------------------
+# softmax
+
+function transform!{T}(act::Activation{:softmax,T})
+    out = act.output.val
+    for i=1:act.n
+        out[i] = exp(act.input.val[i])
+    end
+    s = one(T) / sum(out)
+    for i=1:act.n
+        out[i] *= s
+    end
+    out
+end
+
+# the calc is done in the CrossEntropyLoss... just pass that gradient back
+function grad!{T}(act::Activation{:softmax,T})
+    act.input.∇[:] = act.output.∇
+end
 
 # ----------------------------------------------------------------------------
 

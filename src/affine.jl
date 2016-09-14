@@ -1,16 +1,16 @@
 
-# initial weightings for w
-function initial_weights{T}(::Type{T}, nin::Int, nout::Int, strat::Symbol = :default)
-    if strat == :default
-        (0.5 / sqrt(nin)) * randn(T, nout, nin)
-    else
-        error("Unknown strat in initial_weights: $strat")
-    end
-end
+# # initial weightings for w
+# function initial_weights{T}(::Type{T}, nin::Int, nout::Int, strat::Symbol = :default)
+#     if strat == :default
+#         (0.5 / sqrt(nin)) * randn(T, nout, nin)
+#     else
+#         error("Unknown strat in initial_weights: $strat")
+#     end
+# end
 
 function initialize_weights!{T}(w::AbstractArray{T})
     nin, nout = size(w)
-    scalar = T(0.5 / sqrt(nin))
+    scalar = sqrt(T(2.0 / (nin + nout)))
     for i in eachindex(w)
         w[i] = scalar * randn(T)
     end
@@ -25,25 +25,18 @@ immutable Affine{T} <: Learnable
     nin::Int
     nout::Int
     input::Node{:input,T,1}
-    # w::Node{:param,T,2}
-    # b::Node{:param,T,1}
     output::Node{:output,T,1}
-    # θ::CatView{2,T}
-    # ∇θ::CatView{2,T}
     params::Params
 
     function Affine(nin::Int, nout::Int,
-                    Θ::AbstractVector = zeros(T, nout*(nin+1)),
+                    θ::AbstractVector = zeros(T, nout*(nin+1)),
                     ∇::AbstractVector = zeros(T, nout*(nin+1)))
         input = Node(:input, zeros(T, nin))
-        # w = Node(:param, initial_weights(T, nin, nout))
-        # b = Node(:param, zeros(T, nout))
         output = Node(:output, zeros(T, nout))
-        params = Params(Θ, ∇, ((nout,nin), (nout,)))
+        params = Params(θ, ∇, ((nout,nin), (nout,)))
         w, b = params.views
         initialize_weights!(w)
         initialize_bias!(b)
-        # new(nin, nout, input, w, b, output, CatView(w.val, b.val), CatView(w.∇, b.∇))
         new(nin, nout, input, output, params)
     end
 end
@@ -56,8 +49,8 @@ function Base.show(io::IO, t::Affine)
     print(io, "Affine{$(t.nin)-->$(t.nout), input=$(t.input), output=$(t.output)}")
 end
 
-params_length(aff::Affine) = length(aff.params.Θ)
-params(aff::Affine) = aff.params.Θ
+params_length(aff::Affine) = length(aff.params.θ)
+params(aff::Affine) = aff.params.θ
 grad(aff::Affine) = aff.params.∇
 
 # compute output = wx + b
