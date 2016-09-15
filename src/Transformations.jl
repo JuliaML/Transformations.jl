@@ -27,7 +27,9 @@ export
     Affine,
     Activation,
     Chain,
-    ConvFilter
+    ConvFilter,
+    ConvLayer,
+    MaxPooling
 
 function zero!{T,N}(v::AbstractArray{T,N})
     for i in eachindex(v)
@@ -121,6 +123,7 @@ include("affine.jl")
 include("activations.jl")
 include("chain.jl")
 include("convolutions.jl")
+include("pooling.jl")
 
 # ----------------------------------------------------------------
 

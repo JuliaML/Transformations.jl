@@ -19,13 +19,7 @@ end
 # end
 Chain(ts::Transformation...) = Chain(Float64, ts...)
 
-function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
-    # chain = Chain{T}(input_length(t1), output_length(isempty(ts) ? t1 : ts[end]))
-    # push!(chain, t1)
-    # for t in ts
-    #     push!(chain, t)
-    # end
-    transforms = vcat(t1, ts...)
+function consolidate_params{T}(::Type{T}, transforms::AbstractVector)
     lens = ntuple(i -> params_length(transforms[i]), length(transforms))
     nparams = sum(lens)
     θ = zeros(T, nparams)
@@ -34,10 +28,6 @@ function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
     θs = splitview(θ, sizes)[1]
     ∇s = splitview(∇, sizes)[1]
     for (i,t) in enumerate(transforms)
-        if i > 1
-            link_nodes!(transforms[i-1].output, t.input)
-        end
-
         if params_length(t) > 0
             # first update the values of the new array, then reset the params with this reference
             θs[i][:] = t.params.θ
@@ -45,17 +35,54 @@ function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
             reset!(t.params, θs[i], ∇s[i])
         end
     end
+    Params(θ, ∇)
+end
+
+function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
+    # chain = Chain{T}(input_length(t1), output_length(isempty(ts) ? t1 : ts[end]))
+    # push!(chain, t1)
+    # for t in ts
+    #     push!(chain, t)
+    # end
+    transforms = vcat(t1, ts...)
+
+    for (i,t) in enumerate(transforms)
+        if i > 1
+            link_nodes!(transforms[i-1].output, t.input)
+        end
+    end
+    # lens = ntuple(i -> params_length(transforms[i]), length(transforms))
+    # nparams = sum(lens)
+    # θ = zeros(T, nparams)
+    # ∇ = zeros(T, nparams)
+    # sizes = map(l -> (l,), lens)
+    # θs = splitview(θ, sizes)[1]
+    # ∇s = splitview(∇, sizes)[1]
+    # for (i,t) in enumerate(transforms)
+    #     if i > 1
+    #         link_nodes!(transforms[i-1].output, t.input)
+    #     end
+    #
+    #     if params_length(t) > 0
+    #         # first update the values of the new array, then reset the params with this reference
+    #         θs[i][:] = t.params.θ
+    #         ∇s[i][:] = t.params.∇
+    #         reset!(t.params, θs[i], ∇s[i])
+    #     end
+    # end
+    params = consolidate_params(T, transforms)
 
     nin = input_length(transforms[1])
     nout = output_length(transforms[end])
-    params = Params(θ, ∇)
+    # params = Params(θ, ∇)
     chain = Chain(
         nin,
         nout,
         Node(:input, zeros(T, nin)),
         Node(:output, zeros(T, nout)),
         transforms,
-        Params(θ, ∇)
+        params
+        # Params(θ, ∇)
     )
     link_nodes!(transforms[1].input, chain.input)
     link_nodes!(transforms[end].output, chain.output)

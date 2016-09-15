@@ -102,6 +102,37 @@ end
 # ----------------------------------------------------------------------------
 
 "Wraps several filters for a convolution layer"
-immutable ConvLayer{T,N} <: Learnable
-    filters::Vector{ConvFilter{T,N}}
+immutable ConvLayer{T,N,P<:Params} <: Learnable
+    sizein::NTuple{N,Int}
+    sizeout::NTuple{N,Int}
+    input::Node{:input,T,N}
+    output::Node{:output,T,N}
+    filters::Vector{ConvFilter{T,N,P}}
+    params::P
+end
+
+function ConvLayer{T,N}(::Type{T}, sizein::NTuple{N,Int}, sizefilter::NTuple{N,Int}, numfilters::Int)
+    filters = [ConvFilter(T, sizein, sizefilter) for i=1:numfilters]
+    sizeout = filters[1].sizeout
+    input = Node(:input, zeros(T,sizein))
+    output = Node(:output, zeros(T,(sizeout..., numfilters)))
+    params = consolidate_params(T, filters)
+
+    # TODO: need a concatenating layer of some sort... hmmm
+    # or maybe we need a "link" function that connects a view to part of the array?
+    for filter in filters
+        link_nodes!(input, filter.input)
+        # link_nodes!(output, filter.output)
+    end
+
+    ConvLayer(sizein, sizeout, input, output, filters, params)
+end
+
+function transform!(conv::ConvLayer)
+    foreach(transform!, conv.filters)
+    value(output)
+end
+
+function grad!(conv::ConvLayer)
+    foreach(grad!, conv.filters)
 end
