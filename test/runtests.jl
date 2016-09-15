@@ -86,9 +86,9 @@ end
 
         T = Float64
         chain = Chain(T,
-            Affine{T}(n1, n2),
+            Affine(T, n1, n2),
             Activation{:relu,T}(n2),
-            Affine{T}(n2, n3),
+            Affine(T, n2, n3),
             Activation{:logistic,T}(n3)
         )
         # @show chain

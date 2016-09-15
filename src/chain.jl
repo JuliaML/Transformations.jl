@@ -3,36 +3,41 @@
 # One could represent an ANN like:
 #   affine(n1,n2) --> relu(n2) --> affine(n2,n3) --> logistic(n3)
 # The output of a chain could be fed into a loss model for backprop
-type Chain{T} <: Learnable
+type Chain{T,P<:Params} <: Learnable
     nin::Int
     nout::Int
     input::Node{:input,T}
     output::Node{:output,T}
     ts::Vector{Transformation}
-    params::Params
-
-    function Chain(nin::Int, nout::Int)
-        input = Node(:input, zeros(T, nin))
-        output = Node(:output, zeros(T, nout))
-        new(nin, nout, input, output, Transformation[])
-    end
+    params::P
 end
+
+# function Chain{T}(::Type{T}, nin::Int, nout::Int)
+#     input = Node(:input, zeros(T, nin))
+#     output = Node(:output, zeros(T, nout))
+#     Chain(nin, nout, input, output, Transformation[])
+# end
 Chain(ts::Transformation...) = Chain(Float64, ts...)
 
 function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
-    chain = Chain{T}(input_length(t1), output_length(isempty(ts) ? t1 : ts[end]))
-    push!(chain, t1)
-    for t in ts
-        push!(chain, t)
-    end
-    lens = ntuple(i -> params_length(chain.ts[i]), length(ts)+1)
+    # chain = Chain{T}(input_length(t1), output_length(isempty(ts) ? t1 : ts[end]))
+    # push!(chain, t1)
+    # for t in ts
+    #     push!(chain, t)
+    # end
+    transforms = vcat(t1, ts...)
+    lens = ntuple(i -> params_length(transforms[i]), length(transforms))
     nparams = sum(lens)
     θ = zeros(T, nparams)
-    ∇θ = zeros(T, nparams)
+    ∇ = zeros(T, nparams)
     sizes = map(l -> (l,), lens)
     θs = splitview(θ, sizes)[1]
-    ∇s = splitview(∇θ, sizes)[1]
-    for (i,t) in enumerate(chain.ts)
+    ∇s = splitview(∇, sizes)[1]
+    for (i,t) in enumerate(transforms)
+        if i > 1
+            link_nodes!(transforms[i-1].output, t.input)
+        end
+
         if params_length(t) > 0
             # first update the values of the new array, then reset the params with this reference
             θs[i][:] = t.params.θ
@@ -40,7 +45,20 @@ function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
             reset!(t.params, θs[i], ∇s[i])
         end
     end
-    chain.params = Params(θ, ∇θ)
+
+    nin = input_length(transforms[1])
+    nout = output_length(transforms[end])
+    params = Params(θ, ∇)
+    chain = Chain(
+        nin,
+        nout,
+        Node(:input, zeros(T, nin)),
+        Node(:output, zeros(T, nout)),
+        transforms,
+        Params(θ, ∇)
+    )
+    link_nodes!(transforms[1].input, chain.input)
+    link_nodes!(transforms[end].output, chain.output)
     chain
 end
 
@@ -54,22 +72,20 @@ function Base.show{T}(io::IO, chain::Chain{T})
     print(io, ") ")
 end
 
-# add a transformation to the end of the pipeline
-function Base.push!(chain::Chain, t::Transformation)
-    # the new input should be linked to:
-    #   - the chain input if it's first, otherwise
-    #   - the last transformation's output
-    link_nodes!(t.input, isempty(chain.ts) ? chain.input : chain.ts[end].output)
-
-    # we always update the chain output to match the output of the last transformation
-    link_nodes!(t.output, chain.output)
-
-    push!(chain.ts, t)
-    chain
-end
+# # add a transformation to the end of the pipeline
+# function Base.push!(chain::Chain, t::Transformation)
+#     # the new input should be linked to:
+#     #   - the chain input if it's first, otherwise
+#     #   - the last transformation's output
+#     link_nodes!(t.input, isempty(chain.ts) ? chain.input : chain.ts[end].output)
+#
+#     # we always update the chain output to match the output of the last transformation
+#     link_nodes!(t.output, chain.output)
+#
+#     push!(chain.ts, t)
+#     chain
+# end
 
 # now that it's set up, just go forward to transform, or backwards to backprop
 transform!(chain::Chain) = (foreach(transform!, chain.ts); chain.output.val)
 grad!(chain::Chain) = foreach(grad!, reverse(chain.ts))
-
-# TODO: should make CatViews θ and ∇θ

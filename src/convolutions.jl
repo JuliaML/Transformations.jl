@@ -1,13 +1,13 @@
 
 "A convolutional filter. One would normally fit many such filters as part of a convolutional layer."
-immutable ConvFilter{T,N} <: Learnable
+immutable ConvFilter{T,N,P<:Params} <: Learnable
     sizein::NTuple{N,Int}
     sizeout::NTuple{N,Int}
     sizefilter::NTuple{N,Int}
     stride::NTuple{N,Int}
     input::Node{:input,T,N}
     output::Node{:output,T,N}
-    params::Params
+    params::P
 end
 ConvFilter(args...) = ConvFilter(Float64, args...)
 
@@ -97,4 +97,11 @@ function grad!{T}(filter::ConvFilter{T,2})
 
     ∇b[1] = sum(∇y)
     return
+end
+
+# ----------------------------------------------------------------------------
+
+"Wraps several filters for a convolution layer"
+immutable ConvLayer{T,N} <: Learnable
+    filters::Vector{ConvFilter{T,N}}
 end

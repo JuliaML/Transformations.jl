@@ -21,28 +21,39 @@ function initialize_bias!{T}(b::AbstractArray{T})
 end
 
 # output = wx + b
-immutable Affine{T} <: Learnable
+immutable Affine{T,P<:Params} <: Learnable
     nin::Int
     nout::Int
     input::Node{:input,T,1}
     output::Node{:output,T,1}
-    params::Params
+    params::P
 
-    function Affine(nin::Int, nout::Int,
-                    θ::AbstractVector = zeros(T, nout*(nin+1)),
-                    ∇::AbstractVector = zeros(T, nout*(nin+1)))
-        input = Node(:input, zeros(T, nin))
-        output = Node(:output, zeros(T, nout))
-        params = Params(θ, ∇, ((nout,nin), (nout,)))
-        w, b = params.views
-        initialize_weights!(w)
-        initialize_bias!(b)
-        new(nin, nout, input, output, params)
-    end
+    # function Affine(nin::Int, nout::Int,
+    #                 θ::AbstractVector = zeros(T, nout*(nin+1)),
+    #                 ∇::AbstractVector = zeros(T, nout*(nin+1)))
+    #     input = Node(:input, zeros(T, nin))
+    #     output = Node(:output, zeros(T, nout))
+    #     params = Params(θ, ∇, ((nout,nin), (nout,)))
+    #     w, b = params.views
+    #     initialize_weights!(w)
+    #     initialize_bias!(b)
+    #     new(nin, nout, input, output, params)
+    # end
 end
 
-Affine{T}(::Type{T}, nin::Int, nout::Int, args...) = Affine{T}(nin, nout, args...)
-Affine(nin::Int, nout::Int, args...) = Affine{Float64}(nin, nout, args...)
+# Affine{T}(::Type{T}, nin::Int, nout::Int, args...) = Affine{T}(nin, nout, args...)
+function Affine{T}(::Type{T}, nin::Int, nout::Int,
+                    θ::AbstractVector = zeros(T, nout*(nin+1)),
+                    ∇::AbstractVector = zeros(T, nout*(nin+1)))
+    input = Node(:input, zeros(T, nin))
+    output = Node(:output, zeros(T, nout))
+    params = Params(θ, ∇, ((nout,nin), (nout,)))
+    w, b = params.views
+    initialize_weights!(w)
+    initialize_bias!(b)
+    Affine(nin, nout, input, output, params)
+end
+Affine(nin::Int, nout::Int, args...) = Affine(Float64, nin, nout, args...)
 
 # Base.show(io::IO, aff::Affine) = print(io, "Affine{$(aff.nin)-->$(aff.nout), input=$(aff.input), w=$(aff.w), b=$(aff.b), output=$(t.output)}")
 function Base.show(io::IO, t::Affine)
