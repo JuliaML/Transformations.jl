@@ -9,12 +9,12 @@ function Node{T,N}(nodetype::Symbol, val::Array{T,N})
     Node{nodetype,T,N}(val, zeros(val))
 end
 
-function Node(nodetype::Symbol, n::Int)
-    Node{nodetype,Float64,1}(zeros(n), zeros(n))
+function Node(nodetype::Symbol, n::Int...)
+    Node{nodetype,Float64,length(n)}(zeros(n...), zeros(n...))
 end
 
-function Node{T}(::Type{T}, nodetype::Symbol, n::Int)
-    Node{nodetype,T,1}(zeros(T,n), zeros(T,n))
+function Node{T}(::Type{T}, nodetype::Symbol, n::Int...)
+    Node{nodetype,T,length(n)}(zeros(T,n...), zeros(T,n...))
 end
 
 Base.show{TYPE}(io::IO, node::Node{TYPE}) = print(io, "$TYPE$(size(node.val))")

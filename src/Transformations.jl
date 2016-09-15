@@ -26,7 +26,8 @@ export
     link_nodes!,
     Affine,
     Activation,
-    Chain
+    Chain,
+    ConvFilter
 
 function zero!{T,N}(v::AbstractArray{T,N})
     for i in eachindex(v)
@@ -81,13 +82,13 @@ grad(t::Learnable) = grad(t.params)
 
 
 # Copy input values into the input node, then transform
-function transform!(t::Transformation, input::AbstractVector)
+function transform!(t::Transformation, input::AbstractArray)
     copy!(input_value(t), input)
     transform!(t)
 end
 
 # Copy the gradient into the output node, and propagate it back.
-function grad!(t::Transformation, ∇out::AbstractVector)
+function grad!(t::Transformation, ∇out::AbstractArray)
     copy!(output_grad(t), ∇out)
     grad!(t)
 end
@@ -119,6 +120,7 @@ include("nodes.jl")
 include("affine.jl")
 include("activations.jl")
 include("chain.jl")
+include("convolutions.jl")
 
 # ----------------------------------------------------------------
 

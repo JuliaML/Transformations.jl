@@ -110,3 +110,43 @@ end
         @test manual_output == output
     end
 end
+
+@testset "ConvFilter" begin
+    nin = (3,3)
+    nfilter = (2,2)
+    stride = (1,1)
+    nrf, ncf = nfilter
+    x = reshape(linspace(1,9,9), nin...)
+    f = ConvFilter(nin, nfilter, stride)
+
+    @test f.sizein == nin
+    @test f.sizefilter == nfilter
+    @test f.sizeout == (2,2)
+
+    w, b = f.params.views
+    b[1] = 0.5
+    @test size(w) == nfilter
+    @test size(b) == (1,)
+
+    y = transform!(f, x)
+    nr,nc = f.sizeout
+    for r=1:nr, c=1:nc
+        @test y[r,c] ≈ sum(w .* view(x, r:r+nrf-1, c:c+ncf-1)) + b[1]
+    end
+
+    ∇y = rand(f.sizeout...)
+    grad!(f, ∇y)
+
+    ∇x = input_grad(f)
+    ∇w, ∇b = f.params.∇_views
+    for i=1:nrf, j=1:ncf
+        @test ∇w[i,j] ≈ sum(view(x, i:nr+i-1, j:nc+j-1) .* ∇y)
+    end
+    @test ∇b[1] == sum(∇y)
+    for r=1:nin[1], c=1:nin[2]
+        @test ∇x[r,c] ≈ sum(view(w, nrf:-1:1, ncf:-1:1) .*
+            Transformations.TileView{Float64,2,typeof(∇y)}(∇y, (r-nrf+1,c-ncf+1), (nrf,ncf)))
+    end
+
+    # TODO: once stride is implemented, test that
+end
