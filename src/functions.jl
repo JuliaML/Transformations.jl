@@ -76,13 +76,6 @@ function rosenbrock_gradient(θ::AbstractVector)
         if i < n
             ∇[i] += 2*(θ[i]-1) - 400θ[i] * (θ[i+1] - θ[i]^2)
         end
-        # ∇[i] = θ[i] * (400θ[i] + 202) - 2
-        # if i > 1
-        #     ∇[i] -= 200θ[i-1]
-        # end
-        # if i < n
-        #     ∇[i] -= 400θ[i]*θ[i+1]
-        # end
     end
     ∇
 end
@@ -91,7 +84,7 @@ function rosenbrock_gradient(θs::Number...)
     rosenbrock_gradient(collect(θs))
 end
 
-function rosenbrock_transform(nθ::Int)
+function rosenbrock_transform(nθ::Int = 2)
     @assert nθ > 1
     Differentiable(rosenbrock, 0, nθ, rosenbrock_gradient)
 end
