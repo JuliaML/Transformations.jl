@@ -18,7 +18,7 @@ function ConvFilter{T,N}(::Type{T}, sizein::NTuple{N,Int}, sizefilter::NTuple{N,
     sizeout = (nr_x-nr_f+1, nc_x-nc_f+1)
     output = Node(:output, zeros(T, sizeout...))
     nparams = prod(sizefilter) + 1
-    params = Params(zeros(T, nparams), zeros(T, nparams), (sizefilter, (1,)))
+    params = Params(T, nparams, (sizefilter, (1,)))
     w, b = params.views
     initialize_weights!(w)
     initialize_bias!(b)

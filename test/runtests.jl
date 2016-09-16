@@ -4,6 +4,7 @@ using Base.Test
 # import OnlineStats: Means
 
 using Losses
+using Transformations.TestTransforms
 
 @testset "Affine" begin
     let nin=2, nout=3, input=rand(nin), target=rand(nout)
@@ -149,4 +150,24 @@ end
     end
 
     # TODO: once stride is implemented, test that
+end
+
+@testset "Differentiable" begin
+    f(θ) = sum(100θ.^2)
+    df(θ) = map(θi -> 200θi, θ)
+    t = Differentiable(f, 0, 2, df)
+    θ = params(t)
+    θ[:] = [1.,2.]
+    @test transform!(t) == f(θ)
+    grad!(t)
+    @test grad(t) == df(θ)
+
+    t = Differentiable(rosenbrock, 0, 4, rosenbrock_gradient)
+    @test typeof(t) <: OnceDifferentiable{Float64}
+    θ = params(t)
+    @test size(θ) == (4,)
+    θ[:] = linspace(0,3,4)
+    @test transform!(t) == rosenbrock(θ)
+    grad!(t)
+    @test grad(t) == rosenbrock_gradient(θ)
 end

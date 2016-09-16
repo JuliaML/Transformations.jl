@@ -38,6 +38,12 @@ function Params(θ::AbstractVector, ∇::AbstractVector, sizes = ())
     Params(θ, ∇, views, ∇_views, sizes)
 end
 
+function Params{T}(::Type{T}, n::Int, sizes = ())
+    θ = zeros(T, n)
+    ∇ = zeros(T, n)
+    Params(θ, ∇, sizes)
+end
+
 function reset!(p::Params, θ::AbstractVector, ∇::AbstractVector)
     p.θ = θ
     p.∇ = ∇

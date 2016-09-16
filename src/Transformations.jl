@@ -29,7 +29,11 @@ export
     Chain,
     ConvFilter,
     ConvLayer,
-    MaxPooling
+    MaxPooling,
+    Differentiable,
+    NonDifferentiable,
+    OnceDifferentiable,
+    TwiceDifferentiable
 
 function zero!{T,N}(v::AbstractArray{T,N})
     for i in eachindex(v)
@@ -124,6 +128,7 @@ include("activations.jl")
 include("chain.jl")
 include("convolutions.jl")
 include("pooling.jl")
+include("functions.jl")
 
 # ----------------------------------------------------------------
 
