@@ -27,6 +27,7 @@ export
     Affine,
     Activation,
     Chain,
+    nnet,
     ConvFilter,
     ConvLayer,
     MaxPooling,
@@ -49,9 +50,6 @@ input_value(t::Transformation) = value(input_node(t))
 output_value(t::Transformation) = value(output_node(t))
 input_grad(t::Transformation) = grad(input_node(t))
 output_grad(t::Transformation) = grad(output_node(t))
-
-# # return a view of the parameter vector... may be a CatView/SplitView
-# function params end
 
 abstract Learnable <: Transformation
 
@@ -99,25 +97,19 @@ function grad!(t::Transformation, ∇out::AbstractArray)
     grad!(t)
 end
 
+# ----------------------------------------------------------------
 
-# # return a CatView of the params
-# function params(t::Transformation)
-#     t.θ
-# end
-#
-# # return a CatView of the param gradients
-# function grad(t::Transformation)
-#     t.∇θ
-# end
+function initialize_weights!{T}(w::AbstractArray{T})
+    nout, nin = size(w)
+    scalar = sqrt(T(2.0 / (nin + nout)))
+    for i in eachindex(w)
+        w[i] = scalar * (rand(T) - T(0.5))
+    end
+end
 
-# # update our params
-# # TODO: handle learning rate better
-# function addgrad!(t::Transformation, dθ::AbstractVector, η::Number)
-#     for (i,j) in zip(eachindex(t.θ), eachindex(dθ))
-#         t.θ[i] += η * dθ[j]
-#     end
-# end
-
+function initialize_bias!{T}(b::AbstractArray{T})
+    fill!(b, zero(T))
+end
 
 # ----------------------------------------------------------------
 

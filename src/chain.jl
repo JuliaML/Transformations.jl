@@ -89,6 +89,11 @@ function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
     chain
 end
 
+Base.getindex(chain::Chain, i) = chain.ts[i]
+Base.length(chain::Chain) = length(chain.ts)
+Base.size(chain::Chain) = size(chain.ts)
+Base.endof(chain::Chain) = length(chain)
+
 function Base.show{T}(io::IO, chain::Chain{T})
     println(io, "Chain{$T}(")
     for t in chain.ts
@@ -116,3 +121,22 @@ end
 # now that it's set up, just go forward to transform, or backwards to backprop
 transform!(chain::Chain) = (foreach(transform!, chain.ts); chain.output.val)
 grad!(chain::Chain) = foreach(grad!, reverse(chain.ts))
+
+# ---------------------------------------------------------------------
+
+function nnet(nin::Int, nout::Int, nh = [],
+              inner_activation = :tanh,
+              final_activation = :identity)
+    ns = vcat(nin, nh, nout)
+    layers = []
+    for i=1:length(ns)-1
+        push!(layers, Affine(ns[i], ns[i+1]))
+        if inner_activation != :identity
+            push!(layers, Activation(inner_activation, ns[i+1]))
+        end
+    end
+    if final_activation != :identity
+        push!(layers, Activation(final_activation, nout))
+    end
+    Chain(layers...)
+end

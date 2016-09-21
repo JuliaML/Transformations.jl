@@ -1,25 +1,4 @@
 
-# # initial weightings for w
-# function initial_weights{T}(::Type{T}, nin::Int, nout::Int, strat::Symbol = :default)
-#     if strat == :default
-#         (0.5 / sqrt(nin)) * randn(T, nout, nin)
-#     else
-#         error("Unknown strat in initial_weights: $strat")
-#     end
-# end
-
-function initialize_weights!{T}(w::AbstractArray{T})
-    nin, nout = size(w)
-    scalar = sqrt(T(2.0 / (nin + nout)))
-    for i in eachindex(w)
-        w[i] = scalar * randn(T)
-    end
-end
-
-function initialize_bias!{T}(b::AbstractArray{T})
-    fill!(b, zero(T))
-end
-
 # output = wx + b
 immutable Affine{T,P<:Params} <: Learnable
     nin::Int
@@ -27,21 +6,8 @@ immutable Affine{T,P<:Params} <: Learnable
     input::Node{:input,T,1}
     output::Node{:output,T,1}
     params::P
-
-    # function Affine(nin::Int, nout::Int,
-    #                 θ::AbstractVector = zeros(T, nout*(nin+1)),
-    #                 ∇::AbstractVector = zeros(T, nout*(nin+1)))
-    #     input = Node(:input, zeros(T, nin))
-    #     output = Node(:output, zeros(T, nout))
-    #     params = Params(θ, ∇, ((nout,nin), (nout,)))
-    #     w, b = params.views
-    #     initialize_weights!(w)
-    #     initialize_bias!(b)
-    #     new(nin, nout, input, output, params)
-    # end
 end
 
-# Affine{T}(::Type{T}, nin::Int, nout::Int, args...) = Affine{T}(nin, nout, args...)
 function Affine{T}(::Type{T}, nin::Int, nout::Int,
                     θ::AbstractVector = zeros(T, nout*(nin+1)),
                     ∇::AbstractVector = zeros(T, nout*(nin+1)))
@@ -55,7 +21,6 @@ function Affine{T}(::Type{T}, nin::Int, nout::Int,
 end
 Affine(nin::Int, nout::Int, args...) = Affine(Float64, nin, nout, args...)
 
-# Base.show(io::IO, aff::Affine) = print(io, "Affine{$(aff.nin)-->$(aff.nout), input=$(aff.input), w=$(aff.w), b=$(aff.b), output=$(t.output)}")
 function Base.show(io::IO, t::Affine)
     print(io, "Affine{$(t.nin)-->$(t.nout), input=$(t.input), output=$(t.output)}")
 end
