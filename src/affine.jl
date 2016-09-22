@@ -22,7 +22,7 @@ end
 Affine(nin::Int, nout::Int, args...) = Affine(Float64, nin, nout, args...)
 
 function Base.show(io::IO, t::Affine)
-    print(io, "Affine{$(t.nin)-->$(t.nout), input=$(t.input), output=$(t.output)}")
+    print(io, "Affine{$(t.nin)-->$(t.nout)}")
 end
 
 params_length(aff::Affine) = length(aff.params.θ)

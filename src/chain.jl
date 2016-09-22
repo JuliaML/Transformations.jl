@@ -129,10 +129,11 @@ function nnet(nin::Int, nout::Int, nh = [],
               inner_activation = :tanh,
               final_activation = :identity)
     ns = vcat(nin, nh, nout)
+    num_affine = length(ns) - 1
     layers = []
-    for i=1:length(ns)-1
+    for i=1:num_affine
         push!(layers, Affine(ns[i], ns[i+1]))
-        if inner_activation != :identity
+        if inner_activation != :identity && i < num_affine
             push!(layers, Activation(inner_activation, ns[i+1]))
         end
     end
