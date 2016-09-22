@@ -33,6 +33,7 @@ function consolidate_params{T}(::Type{T}, transforms::AbstractVector)
             θs[i][:] = t.params.θ
             ∇s[i][:] = t.params.∇
             reset!(t.params, θs[i], ∇s[i])
+            @assert t.params.θ === θs[i]
         end
     end
     Params(θ, ∇)

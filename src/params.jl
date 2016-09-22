@@ -35,7 +35,11 @@ end
 function Params(θ::AbstractVector, ∇::AbstractVector, sizes = ())
     views = splitview(θ, sizes)[1]
     ∇_views = splitview(∇, sizes)[1]
-    Params(θ, ∇, views, ∇_views, sizes)
+
+    # note: we pass views in so that if we need to swap these out with other views later
+    #   we don't have to make a copy (type T is stable)
+    n = length(θ)
+    Params(view(θ,1:n), view(∇,1:n), views, ∇_views, sizes)
 end
 
 function Params{T}(::Type{T}, n::Int, sizes = ())

@@ -103,7 +103,7 @@ function initialize_weights!{T}(w::AbstractArray{T})
     nout, nin = size(w)
     scalar = sqrt(T(2.0 / (nin + nout)))
     for i in eachindex(w)
-        w[i] = scalar * (rand(T) - T(0.5))
+        w[i] = scalar * randn(T)
     end
 end
 
