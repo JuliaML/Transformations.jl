@@ -21,7 +21,7 @@ immutable Activation{F,T} <: Transformation
 end
 Activation(s::Symbol, n::Int) = Activation{s,Float64}(n)
 
-Base.show{F,T}(io::IO, act::Activation{F,T}) = print(io, "$F($T, $(act.n))")
+Base.show{F,T}(io::IO, act::Activation{F,T}) = print(io, "$F{$(act.n)}")
 
 input_length(act::Activation) = act.n
 output_length(act::Activation) = act.n
