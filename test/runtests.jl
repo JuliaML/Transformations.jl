@@ -171,3 +171,37 @@ end
     grad!(t)
     @test grad(t) == rosenbrock_gradient(θ)
 end
+
+@testset "Distributions" begin
+    n = 4
+    σ = rand(n)
+    t = MvNormalTransformation(σ)
+    @test typeof(t.dist.μ) <: Distributions.ZeroVector
+    @test typeof(t.dist.Σ) <: Distributions.PDiagMat
+    @test t.n == n
+    @test t.nμ == 0
+    @test t.nΛ == n
+    @test input_length(t) == n
+    @test output_length(t) == n
+    newx = rand(n)
+    transform!(t, newx)
+    @test t.dist.Σ.diag == newx
+    @test t.dist.Σ.inv_diag == 1 ./ newx
+
+    μ = rand(n)
+    Λ = rand(n,n)
+    t = MvNormalTransformation(μ, Λ*Λ')
+    @test typeof(t.dist.μ) <: Vector{Float64}
+    @test typeof(t.dist.Σ) <: Distributions.PDMat
+    @test t.n == n
+    @test t.nμ == n
+    @test t.nΛ == div(n*(n+1), 2)
+    @test input_length(t) == n + div(n*(n+1), 2)
+    @test output_length(t) == n
+    newx = rand(input_length(t))
+    transform!(t, newx)
+    @test t.dist.μ == newx[1:n]
+    cf = t.dist.Σ.chol[:UL]
+    @test cf[1,2] == newx[n+2]
+    @test cf[end] == newx[end]
+end

@@ -9,7 +9,7 @@ using RecipesBase
 import CatViews: CatView, splitview
 import Base: rand
 import LearnBase: transform, transform!, grad, grad!, addgrad!, value
-import StatsBase: logistic, logit
+# import StatsBase: logistic, logit
 
 export
     input_node,
@@ -34,7 +34,8 @@ export
     Differentiable,
     NonDifferentiable,
     OnceDifferentiable,
-    TwiceDifferentiable
+    TwiceDifferentiable,
+    MvNormalTransformation
 
 function zero!{T,N}(v::AbstractArray{T,N})
     for i in eachindex(v)
@@ -122,6 +123,7 @@ include("chain.jl")
 include("convolutions.jl")
 include("pooling.jl")
 include("functions.jl")
+include("distributions.jl")
 
 # ----------------------------------------------------------------
 

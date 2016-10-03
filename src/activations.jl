@@ -40,7 +40,8 @@ grad!(act::Activation{:identity}) = act.input.∇
 # for the following, compute the derivative f′(x), where y = act(x) is assumed precomputed
 # ref: https://en.wikipedia.org/wiki/Activation_function
 
-# logistic (sigmoid): act(x) = 1 ./ (1 .+ exp.(-x))
+logit(x::Real) = log(x / (one(x) - x))
+logistic(x::Real) = one(x) / (one(x) + exp(-x))
 logistic′{T<:Number}(x::T, y::T) = y * (one(T) - y)
 
 # tanh: act(x) = (eˣ .- e⁻ˣ) ./ (eˣ .+ e⁻ˣ)
