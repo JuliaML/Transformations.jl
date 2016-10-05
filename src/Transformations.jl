@@ -22,6 +22,7 @@ export
     output_grad,
     params,
 
+    Learnable,
     Node,
     link_nodes!,
     Affine,
@@ -91,6 +92,10 @@ function transform!(t::Transformation, input::AbstractArray)
     copy!(input_value(t), input)
     transform!(t)
 end
+
+# # allow a transformation to be "called" to transform:  output = t(input)
+# (t::T){T<:Transformation}(input::AbstractArray) = transform!(t, input)
+# (t::T){T<:Transformation}() = transform!(t)
 
 # Copy the gradient into the output node, and propagate it back.
 function grad!(t::Transformation, ∇out::AbstractArray)
