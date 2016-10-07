@@ -8,7 +8,7 @@ using RecipesBase
 
 import CatViews: CatView, splitview
 import Base: rand
-import LearnBase: transform, transform!, grad, grad!, addgrad!, value
+import LearnBase: transform, transform!, grad, grad!, addgrad!, value, params
 # import StatsBase: logistic, logit
 
 export
@@ -20,9 +20,9 @@ export
     output_value,
     input_grad,
     output_grad,
-    params,
+    # params,
 
-    Learnable,
+    # Learnable,
     Node,
     link_nodes!,
     Affine,
@@ -53,7 +53,7 @@ output_value(t::Transformation) = value(output_node(t))
 input_grad(t::Transformation) = grad(input_node(t))
 output_grad(t::Transformation) = grad(output_node(t))
 
-abstract Learnable <: Transformation
+# abstract Learnable <: Transformation
 
 "The length of the parameter vector"
 params_length(t::Transformation) = 0
