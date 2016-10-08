@@ -1,6 +1,11 @@
 
 import Distributions: MvNormal, ZeroVector, PDiagMat
 
+# NOTE: see http://qwone.com/~jason/writing/multivariateNormal.pdf
+#   for derivations of gradients wrt μ and Λ:
+#       ∇log P(z|ϕ)
+
+
 """
 A transformation which is a MultivariateNormal generated using either of the equations:
 
