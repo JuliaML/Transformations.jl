@@ -8,7 +8,7 @@ using RecipesBase
 
 import CatViews: CatView, splitview
 import Base: rand
-import LearnBase: transform, transform!, grad, grad!, addgrad!, value, params
+import LearnBase: transform, transform!, grad, grad!, addgrad!, value, params, update!
 # import StatsBase: logistic, logit
 
 export
@@ -100,6 +100,12 @@ end
 # Copy the gradient into the output node, and propagate it back.
 function grad!(t::Transformation, ∇out::AbstractArray)
     copy!(output_grad(t), ∇out)
+    grad!(t)
+end
+
+# do a forward and backward pass for an observation
+function update!{T,S}(t::Minimizable, obs::Tuple{T,S})
+    transform!(t, obs[2], obs[1])
     grad!(t)
 end
 
