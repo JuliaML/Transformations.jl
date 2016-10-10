@@ -155,14 +155,14 @@ end
 @testset "Differentiable" begin
     f(θ) = sum(100θ.^2)
     df(θ) = map(θi -> 200θi, θ)
-    t = Differentiable(f, 0, 2, df)
+    t = tfunc(f, 2, df)
     θ = params(t)
     θ[:] = [1.,2.]
     @test transform!(t) == f(θ)
     grad!(t)
     @test grad(t) == df(θ)
 
-    t = Differentiable(rosenbrock, 0, 4, rosenbrock_gradient)
+    t = tfunc(rosenbrock, 4, rosenbrock_gradient)
     @test typeof(t) <: OnceDifferentiable{Float64}
     θ = params(t)
     @test size(θ) == (4,)
