@@ -21,6 +21,7 @@ export
     input_grad,
     output_grad,
     # params,
+    totalcost,
 
     # Learnable,
     Node,
@@ -33,6 +34,7 @@ export
     ConvLayer,
     MaxPooling,
     Differentiable,
+    tfunc,  # shorthand constructor for Differentiable
     NonDifferentiable,
     OnceDifferentiable,
     TwiceDifferentiable,
@@ -106,6 +108,12 @@ end
 # do a forward and backward pass for an observation
 function update!{T,S}(t::Minimizable, obs::Tuple{T,S})
     transform!(t, obs[2], obs[1])
+    grad!(t)
+end
+
+# when obs == nothing, don't copy input data in transform!
+function update!(t::Minimizable, ::Void)
+    transform!(t)
     grad!(t)
 end
 

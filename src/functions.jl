@@ -7,7 +7,7 @@ A wrapper around a parameterized function of the form f(θ, x...)
 
 The type parameter DIFFNUM is the number of times it can be differentiated.
 """
-type Differentiable{T,DIFFNUM,P<:Params} <: Learnable
+type Differentiable{T,DIFFNUM,P<:Params} <: Minimizable
     f::Function
     df::NTuple{DIFFNUM,Function}
     input::Node{:input,T,1}
@@ -15,12 +15,18 @@ type Differentiable{T,DIFFNUM,P<:Params} <: Learnable
     params::P
 end
 Differentiable(args...) = Differentiable(Float64, args...)
-function Differentiable{T}(::Type{T}, f::Function, nx::Int, nθ::Int, df::Function...)
+function Differentiable{T}(::Type{T}, f::Function, nθ::Int, nx::Int, df::Function...)
     input = Node(:input, zeros(T, nx))
     output = Node(:output, zeros(T, 1))
     params = Params(T, nθ)
     Differentiable(f, df, input, output, params)
 end
+
+# a convenience constructor for Differentiable types
+function tfunc(f::Function, nΘ::Int, nx::Int, df::Function...; T = Float64)
+    Differentiable(T, f, nΘ, nx, df...)
+end
+tfunc(f::Function, nΘ::Int, df::Function...; kw...) = tfunc(f, nΘ, 0, df...; kw...)
 
 typealias NonDifferentiable{T,P} Differentiable{T,0,P}
 typealias OnceDifferentiable{T,P} Differentiable{T,1,P}
@@ -39,6 +45,8 @@ function transform!(t::Differentiable)
     t.output.val[1] = apply_function(t, t.f)
 end
 
+totalcost(t::Differentiable) = t.output.val[1]
+
 grad!(t::NonDifferentiable) = error()
 
 function grad!(t::Differentiable)
@@ -55,8 +63,8 @@ using ..Transformations
 
 export
     rosenbrock,
-    rosenbrock_gradient,
-    rosenbrock_transform
+    rosenbrock_gradient
+    # rosenbrock_transform
 
 function rosenbrock(θ::AbstractVector)
     sum(100(θ[i+1] - θ[i]^2)^2 + (θ[i] - 1)^2 for i=1:length(θ)-1)
@@ -84,9 +92,9 @@ function rosenbrock_gradient(θs::Number...)
     rosenbrock_gradient(collect(θs))
 end
 
-function rosenbrock_transform(nθ::Int = 2)
-    @assert nθ > 1
-    Differentiable(rosenbrock, 0, nθ, rosenbrock_gradient)
-end
+# function rosenbrock_transform(nθ::Int = 2)
+#     @assert nθ > 1
+#     Differentiable(rosenbrock, 0, nθ, rosenbrock_gradient)
+# end
 
 end #TestTransforms
