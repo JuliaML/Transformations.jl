@@ -20,6 +20,8 @@ export
     output_value,
     input_grad,
     output_grad,
+    params_length,
+    consolidate_params,
     # params,
     totalcost,
 

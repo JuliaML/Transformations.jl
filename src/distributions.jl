@@ -107,9 +107,10 @@ end
 # NOTE: this computes the "grad log prob": ∇log P(z | ϕ)
 #   and thus it will not backprop gradients.
 #   It is meant to be used only for policy gradient methods for now!
-function gradlogprob!{T}(∇logP::AbstractVector, mv::MvNormalTransformation{T})
+# function gradlogprob!{T}(∇logP::AbstractVector, mv::MvNormalTransformation{T})
+function grad!{T}(mv::MvNormalTransformation{T})
     ϕ = input_value(mv)
-    # ∇ϕ = input_grad(mv)
+    ∇ϕ = input_grad(mv)
     z = output_value(mv)
     # ∇z = output_grad(mv)  # not used!!
     z̄ = mv.z̄
@@ -127,9 +128,9 @@ function gradlogprob!{T}(∇logP::AbstractVector, mv::MvNormalTransformation{T})
         # note: diag(U) .* diag(Σ⁻¹) == 1 ./ diag(U)
         for i=1:mv.n
             if i <= nμ
-                ∇logP[i] = -T(2) *  mv.dist.Σ.inv_diag[i] * z̄[i]
+                ∇ϕ[i] = -T(2) *  mv.dist.Σ.inv_diag[i] * z̄[i]
             end
-            ∇logP[nμ+i] = scalar / ϕ[nμ+i]
+            ∇ϕ[nμ+i] = scalar / ϕ[nμ+i]
         end
     else
         # do update for upper-triangular
@@ -139,21 +140,21 @@ function gradlogprob!{T}(∇logP::AbstractVector, mv::MvNormalTransformation{T})
 
         # compute gradient of μ: ∇μ = -2 Σ⁻¹ (z-μ)
         if nμ > 0
-            A_mul_B!(view(∇logP, 1:nμ), Σ⁻¹, z̄)
+            A_mul_B!(view(∇ϕ, 1:nμ), Σ⁻¹, z̄)
         end
 
         # compute gradient of U: ∇U = (2-2√‖z-μ‖) U Σ⁻¹
         i = 1
         for r=1:mv.n, c=r:mv.n
-            ∇logPᵢ = zero(T)
+            ∇ϕᵢ = zero(T)
             for j=c:mv.n
-                ∇logPᵢ += U[r,j] * Σ⁻¹[j,c]
+                ∇ϕᵢ += U[r,j] * Σ⁻¹[j,c]
             end
-            ∇logP[nμ+i] = scalar * ∇logPᵢ
+            ∇ϕ[nμ+i] = scalar * ∇ϕᵢ
             i += 1
         end
     end
 
-    @show mv.n nμ ϕ ∇logP z z̄ scalar
+    # @show mv.n nμ ϕ ∇ϕ z z̄ scalar
     return
 end

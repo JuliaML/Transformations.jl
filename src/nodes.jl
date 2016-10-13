@@ -31,3 +31,9 @@ function link_nodes!{TYPE1,TYPE2,T,N}(outnode::Node{TYPE1,T,N}, innode::Node{TYP
     innode.val = outnode.val
     innode.∇ = outnode.∇
 end
+
+function link_nodes!(ts::Transformation...)
+    for i=2:length(ts)
+        link_nodes!(output_node(ts[i-1]), input_node(ts[i]))
+    end
+end
