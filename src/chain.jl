@@ -73,6 +73,10 @@ end
 transform!(chain::Chain) = (foreach(transform!, chain.ts); chain.output.val)
 grad!(chain::Chain) = foreach(grad!, reverse(chain.ts))
 
+function reset_params!{T}(chain::Chain{T}, θ::AbstractVector, ∇::AbstractVector)
+    chain.params = consolidate_params(T, chain.ts, θ=θ, ∇=∇)
+end
+
 # ---------------------------------------------------------------------
 
 function nnet(nin::Int, nout::Int, nh = [],

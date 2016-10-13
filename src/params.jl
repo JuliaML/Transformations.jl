@@ -48,7 +48,10 @@ function Params{T}(::Type{T}, n::Int, sizes = ())
     Params(θ, ∇, sizes)
 end
 
-function reset!(p::Params, θ::AbstractVector, ∇::AbstractVector)
+# most Learnables will just update their reference
+#   but others (Chain, Graphs) will need to re-consolidate params
+function reset_params!(t::Learnable, θ::AbstractVector, ∇::AbstractVector)
+    p = t.params
     p.θ = θ
     p.∇ = ∇
     p.views = splitview(p.θ, p.sizes)[1]
@@ -67,11 +70,14 @@ function consolidate_params{T}(::Type{T}, transforms::Learnable...)
     consolidate_params(T, collect(transforms))
 end
 
-function consolidate_params{T}(::Type{T}, transforms::AbstractVector)
+function consolidate_params{T}(::Type{T}, transforms::AbstractVector;
+                                θ = nothing, ∇ = nothing)
     lens = ntuple(i -> params_length(transforms[i]), length(transforms))
     nparams = sum(lens)
-    θ = zeros(T, nparams)
-    ∇ = zeros(T, nparams)
+    if θ == nothing
+        θ = zeros(T, nparams)
+        ∇ = zeros(T, nparams)
+    end
     sizes = map(l -> (l,), lens)
     θs = splitview(θ, sizes)[1]
     ∇s = splitview(∇, sizes)[1]
@@ -80,7 +86,7 @@ function consolidate_params{T}(::Type{T}, transforms::AbstractVector)
             # first update the values of the new array, then reset the params with this reference
             θs[i][:] = t.params.θ
             ∇s[i][:] = t.params.∇
-            reset!(t.params, θs[i], ∇s[i])
+            reset_params!(t, θs[i], ∇s[i])
             @assert t.params.θ === θs[i]
         end
     end
