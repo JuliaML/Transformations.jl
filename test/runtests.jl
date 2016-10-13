@@ -20,8 +20,8 @@ using Transformations.TestTransforms
     newx = rand(n)
     transform!(t, newx)
     grad!(t)
-    @test t.dist.Σ.diag == newx
-    @test t.dist.Σ.inv_diag == 1 ./ newx
+    @test t.dist.Σ.diag == newx .^ 2
+    @test t.dist.Σ.inv_diag == 1 ./ (newx .^ 2)
 
     μ = rand(n)
     U = rand(n,n)

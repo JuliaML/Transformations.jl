@@ -60,3 +60,29 @@ Base.getindex(p::Params, i::Int) = p.views[i]
 
 value(p::Params) = p.θ
 grad(p::Params) = p.∇
+
+# --------------------------------------------------------------
+
+function consolidate_params{T}(::Type{T}, transforms::Learnable...)
+    consolidate_params(T, collect(transforms))
+end
+
+function consolidate_params{T}(::Type{T}, transforms::AbstractVector)
+    lens = ntuple(i -> params_length(transforms[i]), length(transforms))
+    nparams = sum(lens)
+    θ = zeros(T, nparams)
+    ∇ = zeros(T, nparams)
+    sizes = map(l -> (l,), lens)
+    θs = splitview(θ, sizes)[1]
+    ∇s = splitview(∇, sizes)[1]
+    for (i,t) in enumerate(transforms)
+        if params_length(t) > 0
+            # first update the values of the new array, then reset the params with this reference
+            θs[i][:] = t.params.θ
+            ∇s[i][:] = t.params.∇
+            reset!(t.params, θs[i], ∇s[i])
+            @assert t.params.θ === θs[i]
+        end
+    end
+    Params(θ, ∇)
+end

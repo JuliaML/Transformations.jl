@@ -95,9 +95,13 @@ function transform!(t::Transformation, input::AbstractArray)
     transform!(t)
 end
 
-# # allow a transformation to be "called" to transform:  output = t(input)
-# (t::T){T<:Transformation}(input::AbstractArray) = transform!(t, input)
-# (t::T){T<:Transformation}() = transform!(t)
+# # # allow a transformation to be "called" to transform:  output = t(input)
+# function (t::Transformation)(input::AbstractArray)
+#     transform!(t, input)
+# end
+# function (t::Transformation)()
+#     transform!(t)
+# end
 
 # Copy the gradient into the output node, and propagate it back.
 function grad!(t::Transformation, ∇out::AbstractArray)
