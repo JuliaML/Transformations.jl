@@ -38,7 +38,8 @@ export
     NonDifferentiable,
     OnceDifferentiable,
     TwiceDifferentiable,
-    MvNormalTransformation
+    MvNormalTransformation,
+    Params
 
 function zero!{T,N}(v::AbstractArray{T,N})
     for i in eachindex(v)
