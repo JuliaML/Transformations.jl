@@ -1,9 +1,7 @@
 using Transformations
 using Base.Test
-# using Distributions
-# import OnlineStats: Means
 
-using Losses
+using LossFunctions
 using Transformations.TestTransforms
 
 @testset "Distributions" begin
