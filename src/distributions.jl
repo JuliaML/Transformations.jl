@@ -57,6 +57,8 @@ function transform!(mv::MvNormalTransformation)
 
     # output: sample from the distribution
     rand!(mv.dist, output_value(mv))
+
+    # @show mv.dist output_value(mv)
 end
 
 # # update the gradient w.r.t. inputs ϕ = vec(μ, U)
@@ -132,11 +134,12 @@ function grad!{T}(mv::MvNormalTransformation{T})
             end
             ∇ϕ[nμ+i] = scalar / ϕ[nμ+i]
         end
+        # @show scalar z̄ ϕ ∇ϕ mv.dist.Σ.inv_diag
     else
         # do update for upper-triangular
         Σ⁻¹ = invcov(mv.dist)
         U = UpperTriangular(mv.dist.Σ.chol.factors)
-        @show U Σ⁻¹ typeof(Σ⁻¹)
+        # @show U Σ⁻¹ typeof(Σ⁻¹)
 
         # compute gradient of μ: ∇μ = -2 Σ⁻¹ (z-μ)
         if nμ > 0

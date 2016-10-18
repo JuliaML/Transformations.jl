@@ -15,12 +15,14 @@ end
 Chain(ts::Transformation...) = Chain(Float64, ts...)
 
 function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
-    transforms = vcat(t1, ts...)
-
-    for (i,t) in enumerate(transforms)
-        if i > 1
-            link_nodes!(transforms[i-1].output, t.input)
-        end
+    # transforms = vcat(t1, ts...)
+    transforms = Array(Transformation, length(ts)+1)
+    transforms[1] = t1
+    for (i,t) in enumerate(ts)
+        # if i > 1
+        link_nodes!(transforms[i].output, t.input)
+        transforms[i+1] = t
+        # end
     end
 
     params = consolidate_params(T, transforms)
