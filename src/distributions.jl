@@ -121,9 +121,9 @@ function grad!{T}(mv::MvNormalTransformation{T})
     # update: z̄ = (z - μ)
     copy!(z̄, z)
     for i=1:nμ
-        z̄[i] -= ϕ[i]
+        z̄[i] = ϕ[i] - z̄[i]
     end
-    scalar = T(2) - T(2) * sqrt(norm(z̄))
+    scalar = T(2) * (sqrt(norm(z̄)) - one(T))
 
     if typeof(mv.dist.Σ) <: PDiagMat
         # do update for diagonal
@@ -137,7 +137,13 @@ function grad!{T}(mv::MvNormalTransformation{T})
         # @show scalar z̄ ϕ ∇ϕ mv.dist.Σ.inv_diag
     else
         # do update for upper-triangular
-        Σ⁻¹ = invcov(mv.dist)
+        Σ⁻¹ = try
+            invcov(mv.dist)
+        catch err
+            warn("Error in invcov: $err")
+            return
+        end
+
         U = UpperTriangular(mv.dist.Σ.chol.factors)
         # @show U Σ⁻¹ typeof(Σ⁻¹)
 

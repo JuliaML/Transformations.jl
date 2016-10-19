@@ -119,7 +119,7 @@ function update!{T,S}(t::Minimizable, obs::Tuple{T,S})
 end
 
 # when obs == nothing, don't copy input data in transform!
-function update!(t::Minimizable, ::Void)
+function update!(t::Learnable, ::Void)
     transform!(t)
     grad!(t)
 end
