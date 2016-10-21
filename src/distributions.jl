@@ -106,6 +106,7 @@ end
 
 # -----------------------------------------------------------------------
 
+
 # NOTE: this computes the "grad log prob": ∇log P(z | ϕ)
 #   and thus it will not backprop gradients.
 #   It is meant to be used only for policy gradient methods for now!
@@ -118,50 +119,68 @@ function grad!{T}(mv::MvNormalTransformation{T})
     z̄ = mv.z̄
     nμ = mv.nμ
 
-    # update: z̄ = (z - μ)
-    copy!(z̄, z)
-    for i=1:nμ
-        z̄[i] = ϕ[i] - z̄[i]
-    end
-    scalar = T(2) * (sqrt(norm(z̄)) - one(T))
+    # # update: z̄ = (z - μ)
+    # copy!(z̄, z)
+    # for i=1:nμ
+    #     z̄[i] = ϕ[i] - z̄[i]
+    # end
+    # scalar = T(2) * (sqrt(norm(z̄)) - one(T))
 
     if typeof(mv.dist.Σ) <: PDiagMat
-        # do update for diagonal
-        # note: diag(U) .* diag(Σ⁻¹) == 1 ./ diag(U)
-        for i=1:mv.n
-            if i <= nμ
-                ∇ϕ[i] = -T(2) *  mv.dist.Σ.inv_diag[i] * z̄[i]
-            end
-            ∇ϕ[nμ+i] = scalar / ϕ[nμ+i]
-        end
-        # @show scalar z̄ ϕ ∇ϕ mv.dist.Σ.inv_diag
-    else
-        # do update for upper-triangular
-        Σ⁻¹ = try
-            invcov(mv.dist)
-        catch err
-            warn("Error in invcov: $err")
-            return
-        end
 
-        U = UpperTriangular(mv.dist.Σ.chol.factors)
-        # @show U Σ⁻¹ typeof(Σ⁻¹)
+        # for i=1:mv.n
+        #     # demean z
+        #     z̄[i] = z[i] - (nμ > 0 ? ϕ[i] : zero(T))
+        #
+        #     # ensure we're not dividing by really small numbers
+        #     ϕ[nμ+i] = max(1e-2, ϕ[nμ+i])
+        # end
 
-        # compute gradient of μ: ∇μ = -2 Σ⁻¹ (z-μ)
-        if nμ > 0
-            A_mul_B!(view(∇ϕ, 1:nμ), Σ⁻¹, z̄)
+        @assert nμ > 0
+        # note that μ == ϕ[1:nμ], σ == ϕ[nμ+1:end]
+        for i=1:nμ
+            j = nμ+i  # index of σ
+            ∇ϕ[i] = (z[i] - ϕ[i]) / (ϕ[j]^2 + 1e-6)
+            ∇ϕ[j] = -(one(T) / (ϕ[j]+1e-6) - ∇ϕ[i]^2) / T(2)
         end
+        # @show nμ mv.n z z̄ ϕ ∇ϕ
 
-        # compute gradient of U: ∇U = (2-2√‖z-μ‖) U Σ⁻¹
-        i = 1
-        for r=1:mv.n, c=r:mv.n
-            ∇ϕᵢ = zero(T)
-            for j=c:mv.n
-                ∇ϕᵢ += U[r,j] * Σ⁻¹[j,c]
-            end
-            ∇ϕ[nμ+i] = scalar * ∇ϕᵢ
-            i += 1
-        end
+        # # do update for diagonal
+        # # note: diag(U) .* diag(Σ⁻¹) == 1 ./ diag(U)
+        # for i=1:mv.n
+        #     # if i <= nμ
+        #     #     ∇ϕ[i] = T(2) *  mv.dist.Σ.inv_diag[i] * z̄[i]
+        #     # end
+        #     ∇ϕ[nμ+i] = scalar / ϕ[nμ+i]
+        # end
+        # # @show scalar z̄ ϕ ∇ϕ mv.dist.Σ.inv_diag
+    # else
+    #     # do update for upper-triangular
+    #     Σ⁻¹ = try
+    #         invcov(mv.dist)
+    #     catch err
+    #         warn("Error in invcov: $err")
+    #         return
+    #     end
+    #
+    #     U = UpperTriangular(mv.dist.Σ.chol.factors)
+    #     # @show U Σ⁻¹ typeof(Σ⁻¹)
+    #
+    #     # compute gradient of μ: ∇μ = -2 Σ⁻¹ (z-μ)
+    #     if nμ > 0
+    #         A_mul_B!(view(∇ϕ, 1:nμ), Σ⁻¹, z̄)
+    #     end
+    #
+    #     # compute gradient of U: ∇U = (2-2√‖z-μ‖) U Σ⁻¹
+    #     i = 1
+    #     for r=1:mv.n, c=r:mv.n
+    #         ∇ϕᵢ = zero(T)
+    #         for j=c:mv.n
+    #             ∇ϕᵢ += U[r,j] * Σ⁻¹[j,c]
+    #         end
+    #         ∇ϕ[nμ+i] = scalar * ∇ϕᵢ
+    #         i += 1
+    #     end
     end
 
     # @show mv.n nμ ϕ ∇ϕ z z̄ scalar
