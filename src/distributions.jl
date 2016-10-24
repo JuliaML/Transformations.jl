@@ -1,6 +1,10 @@
 
 import Distributions: MvNormal, ZeroVector, PDiagMat, invcov
 
+
+
+
+
 # NOTE: see http://qwone.com/~jason/writing/multivariateNormal.pdf
 #   for derivations of gradients wrt μ and U:
 #       ∇log P(z|ϕ)
@@ -86,9 +90,9 @@ end
 function transform_Σ!(mv::MvNormalTransformation, Σ::PDiagMat)
     input = input_value(mv)
     for i=1:mv.n
-        xi = input[mv.nμ + i]^2
-        Σ.diag[i] = xi
-        Σ.inv_diag[i] = inv(xi)
+        σᵢ = compute_σ(input[mv.nμ+i])
+        Σ.diag[i] = σᵢ^2
+        Σ.inv_diag[i] = inv(σᵢ)^2
     end
 end
 
@@ -104,8 +108,13 @@ function transform_Σ!(mv::MvNormalTransformation, Σ)
     end
 end
 
+compute_σ(ϕᵢ) = exp(clamp(ϕᵢ, -1e1, 1e1))
+
+
+
 # -----------------------------------------------------------------------
 
+# NOTE: σ = exp(ϕ) so that we map to reasonable positive values
 
 # NOTE: this computes the "grad log prob": ∇log P(z | ϕ)
 #   and thus it will not backprop gradients.
@@ -137,12 +146,26 @@ function grad!{T}(mv::MvNormalTransformation{T})
         # end
 
         @assert nμ > 0
-        # note that μ == ϕ[1:nμ], σ == ϕ[nμ+1:end]
+        # note that μ == ϕ[1:nμ], σ == exp(ϕ[nμ+1:end])
+        ϵ = 1e-6
+
+        μ = view(ϕ, 1:nμ)
+        ∇μ = view(∇ϕ, 1:nμ)
+        s = view(ϕ, nμ+1:2nμ)
+        ∇s = view(∇ϕ, nμ+1:2nμ)
         for i=1:nμ
-            j = nμ+i  # index of σ
-            ∇ϕ[i] = (z[i] - ϕ[i]) / (ϕ[j]^2 + 1e-6)
-            ∇ϕ[j] = -(one(T) / (ϕ[j]+1e-6) - ∇ϕ[i]^2) / T(2)
+            σ = compute_σ(s[i])
+            ∇μ[i] = (z[i] - μ[i]) / σ^2
+            # ∇σ = -(one(T) / σ - ∇μ[i]^2) / T(2)
+            # ∇s[i] = ∇σ * σ
+            ∇s[i] = ∇μ[i] * (z[i] - μ[i]) - one(T)
         end
+        # for i=1:nμ
+        #     j = nμ+i  # index of σ
+        #     ∇ϕ[i] = (z[i] - ϕ[i]) / (exp(ϕ[j])^2 + ϵ)
+        #     ∇ϕ[j] = -(one(T) / (ϕ[j] + ϵ) - ∇ϕ[i]^2) / T(2)
+        #     # ∇ϕ[j] = (z[i] - ϕ[i])^2 / (ϕ[j]^2 + ϵ)
+        # end
         # @show nμ mv.n z z̄ ϕ ∇ϕ
 
         # # do update for diagonal
