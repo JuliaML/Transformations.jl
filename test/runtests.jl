@@ -6,22 +6,21 @@ using Transformations.TestTransforms
 
 @testset "Distributions" begin
     n = 4
+    μ = rand(n)
     σ = rand(n)
-    t = MvNormalTransformation(σ)
-    @test typeof(t.dist.μ) <: Distributions.ZeroVector
+    t = MvNormalTransformation(μ, σ)
     @test typeof(t.dist.Σ) <: Distributions.PDiagMat
     @test t.n == n
-    @test t.nμ == 0
+    @test t.nμ == n
     @test t.nU == n
-    @test input_length(t) == n
+    @test input_length(t) == 2n
     @test output_length(t) == n
-    newx = rand(n)
+    newx = rand(2n)
     transform!(t, newx)
     grad!(t)
-    @test t.dist.Σ.diag == newx .^ 2
-    @test t.dist.Σ.inv_diag == 1 ./ (newx .^ 2)
+    @test t.dist.Σ.diag ≈ newx[n+1:end] .^ 2
+    @test t.dist.Σ.inv_diag ≈ 1 ./ (newx[n+1:end] .^ 2)
 
-    μ = rand(n)
     U = rand(n,n)
     t = MvNormalTransformation(μ, U*U')
     @test typeof(t.dist.μ) <: Vector{Float64}
@@ -49,13 +48,9 @@ end
         ∇w, ∇b = a.params.∇_views
         ∇x, ∇y = input_grad(a), output_grad(a)
         nparams = nout*(nin+1)
-        # @show a loss
 
         for i=1:2
-            # println()
-
             output = transform!(a, input)
-            # @show i output
 
             @test y == w * x + b
             @test size(x) == (nin,)
@@ -72,25 +67,54 @@ end
 
             l = value(loss, target, output)
             dl = deriv(loss, target, output)
-            # @show l dl
-
             grad!(a, dl)
-            # ∇w = ∇[1:(nin*nout)]
-            # ∇b = ∇[(nin*nout+1):end]
-            # @show ∇ a.w.∇ a.b.∇
 
             @test grad(a.output) == dl
-            # @test isa(∇, Transformations.CatView)
-            # @test size(∇) == (length(a.w.∇) + length(a.b.∇),)
             @test ∇w ≈ repmat(input', nout, 1) .* repmat(dl, 1, nin)
             @test ∇b == dl
             @test ∇x ≈ w' * dl
+        end
+    end
+end
 
-            # θ = copy(a.θ)
-            # addgrad!(a, ∇, 1e-2)
-            # @show a.θ
-            #
-            # @test a.θ == θ + 1e-2∇
+@testset "LayerNorm" begin
+    let nin=2, nout=3, input=rand(nin), target=rand(nout)
+        a = LayerNorm(nin, nout)
+        loss = L2DistLoss()
+        w, g, b = a.params.views
+        x, y = input_value(a), output_value(a)
+        ∇w, ∇g, ∇b = a.params.∇_views
+        ∇x, ∇y = input_grad(a), output_grad(a)
+        nparams = nout*(nin+2)
+
+        for i=1:2
+            output = transform!(a, input)
+
+            wx = w * x
+            @test y ≈ g .* (wx .- mean(wx)) ./ std(wx) .+ b
+            @test size(x) == (nin,)
+            @test size(w) == (nout,nin)
+            @test size(g) == (nout,)
+            @test size(b) == (nout,)
+            @test size(y) == (nout,)
+            @test size(∇x) == (nin,)
+            @test size(∇w) == (nout,nin)
+            @test size(∇g) == (nout,)
+            @test size(∇b) == (nout,)
+            @test size(∇y) == (nout,)
+            @test size(output) == (nout,)
+            @test size(params(a)) == (nparams,)
+            @test size(grad(a)) == (nparams,)
+
+            l = value(loss, target, output)
+            dl = deriv(loss, target, output)
+            grad!(a, dl)
+
+            @test grad(a.output) == dl
+            @test ∇w ≈ repmat(input', nout, 1) .* repmat(dl .* g, 1, nin)
+            @test ∇g ≈ dl .* wx
+            @test ∇b == dl
+            @test ∇x ≈ w' * (dl .* g)
         end
     end
 end

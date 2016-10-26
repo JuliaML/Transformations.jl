@@ -29,6 +29,7 @@ export
     Node,
     link_nodes!,
     Affine,
+    LayerNorm,
     Activation,
     Chain,
     nnet,
@@ -144,6 +145,7 @@ end
 include("params.jl")
 include("nodes.jl")
 include("affine.jl")
+include("layernorm.jl")
 include("activations.jl")
 include("chain.jl")
 include("convolutions.jl")
