@@ -8,8 +8,11 @@ using RecipesBase
 
 import CatViews: CatView, splitview
 import Base: rand
-import LearnBase: transform, transform!, grad, grad!, addgrad!, value, params, update!
+import LearnBase: transform, transform!,
+                  grad, grad!, addgrad!,
+                  value, params, update!
 # import StatsBase: logistic, logit
+import OnlineStats: smooth, Weight, BoundedEqualWeight
 
 export
     input_node,
@@ -31,6 +34,9 @@ export
     Affine,
     LayerNorm,
     Activation,
+    PreprocessStep,
+    NoPreprocessing,
+    Whiten,
     Chain,
     nnet,
     ConvFilter,
@@ -152,6 +158,7 @@ include("convolutions.jl")
 include("pooling.jl")
 include("functions.jl")
 include("distributions.jl")
+include("whiten.jl")
 
 # ----------------------------------------------------------------
 

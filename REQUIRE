@@ -1,4 +1,4 @@
-julia 0.5-
+julia 0.5
 
 Reexport
 LearnBase
@@ -6,3 +6,4 @@ RecipesBase
 StatsBase
 Distributions
 CatViews
+OnlineStats
