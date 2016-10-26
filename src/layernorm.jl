@@ -33,7 +33,7 @@ end
 LayerNorm(nin::Int, nout::Int, args...) = LayerNorm(Float64, nin, nout, args...)
 
 function Base.show(io::IO, t::LayerNorm)
-    print(io, "LayerNorm{$(t.nin)-->$(t.nout), μ=$(t.μ), σ=$(t.σ)}")
+    print(io, "LayerNorm{$(t.nin)-->$(t.nout), mu=$(t.μ), sigma=$(t.σ)}")
 end
 
 # compute output = wx + b
