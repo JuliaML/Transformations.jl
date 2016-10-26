@@ -1,8 +1,26 @@
 using Transformations
 using Base.Test
 
-using LossFunctions
+import LossFunctions: L2DistLoss
 using Transformations.TestTransforms
+using Distributions
+
+@testset "Whiten" begin
+    nin, nout = 4, 4
+    μ = rand(nin)
+    Λ = UpperTriangular(rand(nin,nin))
+    Σ = Λ'*Λ
+    mv = MultivariateNormal(μ, Σ)
+    x = rand(mv, 1000)
+
+    w = Whiten(Float64, 1, nin, nout)
+    for i=1:10000
+        input_value(w)[:] = x[:,rand(1:1000)]
+        learn!(w)
+        @show w,i
+    end
+    # y = ?
+end
 
 @testset "Distributions" begin
     n = 4

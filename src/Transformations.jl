@@ -12,7 +12,8 @@ import LearnBase: transform, transform!,
                   grad, grad!, addgrad!,
                   value, params, update!
 # import StatsBase: logistic, logit
-import OnlineStats: smooth, Weight, BoundedEqualWeight
+import OnlineStats
+import OnlineStats: weight, Weight, BoundedEqualWeight
 
 export
     input_node,

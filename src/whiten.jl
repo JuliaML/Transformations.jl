@@ -38,7 +38,7 @@ function Whiten{T}(::Type{T},
                     nout::Int = nin;
                     lookback::Int = 100,
                     α::Float64 = NaN,
-                    wgt::Weight =  BoundedEqualWeight(α == nothing ? lookback : α)
+                    wgt::Weight =  BoundedEqualWeight(isnan(α) ? lookback : α)
                    )
     Whiten{T,N,typeof(wgt)}(
         nin,
@@ -61,7 +61,7 @@ function Base.empty!{T}(o::Whiten{T})
     o
 end
 
-function smooth!{ARR<:AbstractArray}(a::ARR, b::ARR, λ::Number)
+function smooth!{T,N}(a::AbstractArray{T,N}, b::AbstractArray{T,N}, λ::T)
     @assert length(a) == length(b)
     oml = one(λ) - λ
     @inbounds for i=1:length(a)
@@ -71,7 +71,7 @@ end
 
 function center!{T<:AbstractArray}(x::T, x̄::T)
     for i=1:length(x)
-        x[i] -= o.x̄[i]
+        x[i] -= x̄[i]
     end
 end
 
@@ -112,7 +112,7 @@ function learn!(o::Whiten)
 			Vᵢ = Uᵢ / eᵢ
 		else
 			# update the ith eigvec/eigval
-			Uᵢ = row(o.U, i)
+			Uᵢ = view(o.U, i, :)
 			smooth!(Uᵢ, x * (dot(x, Uᵢ) / o.e[i]), λ)
 			eᵢ = norm(Uᵢ)
 			Vᵢ = Uᵢ / eᵢ
