@@ -108,7 +108,8 @@ function transform_Σ!(mv::MvNormalTransformation, Σ)
     end
 end
 
-compute_σ(ϕᵢ) = exp(clamp(ϕᵢ, -1e1, 1e1))
+# compute_σ(ϕᵢ) = exp(clamp(ϕᵢ, -1e1, 1e1))
+compute_σ(ϕᵢ) = ϕᵢ
 
 
 
@@ -156,9 +157,10 @@ function grad!{T}(mv::MvNormalTransformation{T})
         for i=1:nμ
             σ = compute_σ(s[i])
             ∇μ[i] = (z[i] - μ[i]) / σ^2
+            ∇s[i] = (∇μ[i] - one(T)) / σ
             # ∇σ = -(one(T) / σ - ∇μ[i]^2) / T(2)
             # ∇s[i] = ∇σ * σ
-            ∇s[i] = ∇μ[i] * (z[i] - μ[i]) - one(T)
+            # ∇s[i] = ∇μ[i] * (z[i] - μ[i]) - one(T)
         end
         # for i=1:nμ
         #     j = nμ+i  # index of σ
