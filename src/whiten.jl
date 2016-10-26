@@ -4,7 +4,7 @@
 #       used https://github.com/kevinhughes27/pyIPCA/blob/master/pyIPCA/ccipca.py as a reference
 
 abstract PreprocessStep <: Learnable
-immutable NoPreprocessing <: PreprocessStep
+immutable NoPreprocessing <: PreprocessStep end
 
 # # solving for a dimension-reduced Y = XV', where X (n x nin) is the original data, and Y (n x nout) is projected
 # # V (nout x nin) is a matrix where the columns are the first nout eigenvectors of X'X/n (the covariance of X)
