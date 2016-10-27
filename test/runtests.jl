@@ -4,22 +4,34 @@ using Base.Test
 import LossFunctions: L2DistLoss
 using Transformations.TestTransforms
 using Distributions
+using StochasticOptimization.Iteration
+import MultivariateStats
 
 @testset "Whiten" begin
-    nin, nout = 4, 4
+    nin, nout = 4, 2
+    n = 1000
     μ = rand(nin)
     Λ = UpperTriangular(rand(nin,nin))
     Σ = Λ'*Λ
     mv = MultivariateNormal(μ, Σ)
-    x = rand(mv, 1000)
+    x = rand(mv, n)
 
-    w = Whiten(Float64, 1, nin, nout)
+    w = Whiten(Float64, 1, nin, nout, lookback=2n)
     for i=1:10000
-        input_value(w)[:] = x[:,rand(1:1000)]
+        input_value(w)[:] = x[:,rand(1:n)]
         learn!(w)
-        @show w,i
+        # @show w,i
     end
-    # y = ?
+
+    # do it using MultivariateStats
+    wref = MultivariateStats.fit(MultivariateStats.PCA, x, maxoutdim=nout)
+    yref = MultivariateStats.transform(wref, x)
+
+    y = zeros(x)
+    for (xi,yi) in each_obs(x,y)
+        yi[:] = transform!(w,xi)
+    end
+    @test y ≈ yref
 end
 
 @testset "Distributions" begin

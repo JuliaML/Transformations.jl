@@ -84,9 +84,9 @@ function transform!{T}(o::Whiten{T})
     y
 end
 
-function learn!(o::Whiten)
-    x = copy(input_value(o))
-    center!(x, o.x̄)
+function learn!(o::Whiten, x::AbstractVector = input_value(o))
+    x = x - o.x̄
+    # center!(x, o.x̄)
 
     # get the smoothing param
     OnlineStats.updatecounter!(o.wgt)
