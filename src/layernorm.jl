@@ -51,7 +51,7 @@ function transform!{T}(layer::LayerNorm{T})
     layer.μ = mean(y)
     layer.σ = std(y)
     if layer.σ == zero(T)
-        layer.σ == one(T)
+        layer.σ = one(T)
     end
 
     # mult by g and add b

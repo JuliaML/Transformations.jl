@@ -118,7 +118,7 @@ function learn!{T}(o::Whiten{T}, x::AbstractVector = input_value(o))
         # if eᵢ ≈ zero(T)
         #     warn("Got small e[$i] ($(eᵢ)) while computing iteration $(o.wgt.nobs) for:\n  $o")
         # end
-		Vᵢ = Uᵢ / eᵢ
+		Vᵢ = Uᵢ / max(eᵢ, T(1e-6))
 
 		# store these updates
 		o.U[i,:] = Uᵢ
