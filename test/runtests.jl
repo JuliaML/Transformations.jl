@@ -7,32 +7,107 @@ using Distributions
 using StochasticOptimization.Iteration
 import MultivariateStats
 
-@testset "Whiten" begin
+@testset "PCA" begin
     nin, nout = 4, 2
-    n = 1000
-    μ = rand(nin)
+    n = 50
+    μ = zeros(nin)
     Λ = UpperTriangular(rand(nin,nin))
     Σ = Λ'*Λ
     mv = MultivariateNormal(μ, Σ)
     x = rand(mv, n)
 
-    w = Whiten(Float64, 1, nin, nout, lookback=2n)
-    for i=1:10000
-        input_value(w)[:] = x[:,rand(1:n)]
-        learn!(w)
-        # @show w,i
+    # learn the whitening by passing over the data a few times
+    # note: since we do this online, it should approach the "true"
+    # value in the limit
+    totn = 1000n
+    w = Whiten(nin, nout, lookback=100n, method=:pca)
+    for i=1:totn
+        learn!(w, x[:,mod1(i,n)])
     end
 
-    # do it using MultivariateStats
-    wref = MultivariateStats.fit(MultivariateStats.PCA, x, maxoutdim=nout)
-    yref = MultivariateStats.transform(wref, x)
-
-    y = zeros(x)
+    # compute the projected output
+    y = zeros(nout,n)
     for (xi,yi) in each_obs(x,y)
         yi[:] = transform!(w,xi)
     end
-    @test y ≈ yref
+
+    # do it using MultivariateStats (the reference)
+    wref = MultivariateStats.fit(MultivariateStats.PCA, x, maxoutdim=nout)
+    yref = MultivariateStats.transform(wref, x)
+
+    # check that we're close enough to the "true" projection
+    @test norm(abs(y./yref)-1) < 1
+
+    # check that the covariance matrices are close
+    @test maximum(abs(cov(y') - cov(yref'))) < 1e-2
+
+    # check that the means are close
+    @test maximum(abs(mean(y,2) - mean(yref,2))) < 1e-2
 end
+
+@testset "Whitened PCA" begin
+    nin, nout = 4, 2
+    n = 50
+    μ = zeros(nin)
+    Λ = UpperTriangular(rand(nin,nin))
+    Σ = Λ'*Λ
+    mv = MultivariateNormal(μ, Σ)
+    x = rand(mv, n)
+
+    # learn the whitening by passing over the data a few times
+    # note: since we do this online, it should approach the "true"
+    # value in the limit
+    totn = 10n
+    w = Whiten(nin, nout, lookback=10n, method=:whitened_pca)
+    for i=1:totn
+        learn!(w, x[:,mod1(i,n)])
+    end
+
+    # compute the projected output
+    y = zeros(nout,n)
+    for (xi,yi) in each_obs(x,y)
+        yi[:] = transform!(w,xi)
+    end
+
+    # check that the covariance is close to the identity
+    # @show cov(y')
+    @test maximum(abs(cov(y')-I)) < 1e-1
+
+    # check that the mean is close to zero
+    # @show mean(y,2)
+    @test maximum(abs(mean(y,2))) < 1e-1
+end
+
+
+@testset "Whitened ZCA" begin
+    nin, nout = 4, 4
+    n = 50
+    μ = zeros(nin)
+    Λ = UpperTriangular(rand(nin,nin))
+    Σ = Λ'*Λ
+    mv = MultivariateNormal(μ, Σ)
+    x = rand(mv, n)
+
+    # learn the whitening by passing over the data a few times
+    # note: since we do this online, it should approach the "true"
+    # value in the limit
+    totn = 10n
+    w = Whiten(nin, nout, lookback=10n, method=:zca)
+    for i=1:totn
+        learn!(w, x[:,mod1(i,n)])
+    end
+
+    # compute the projected output
+    y = zeros(nout,n)
+    for (xi,yi) in each_obs(x,y)
+        yi[:] = transform!(w,xi)
+    end
+
+    # check that the mean is close to zero
+    # @show mean(y,2)
+    @test maximum(abs(mean(y,2))) < 1e-1
+end
+
 
 @testset "Distributions" begin
     n = 4
