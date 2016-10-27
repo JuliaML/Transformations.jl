@@ -1,6 +1,7 @@
 using Transformations
 using Base.Test
 
+using LearnBase
 import LossFunctions: L2DistLoss
 using Transformations.TestTransforms
 using Distributions
@@ -91,7 +92,7 @@ end
     # learn the whitening by passing over the data a few times
     # note: since we do this online, it should approach the "true"
     # value in the limit
-    totn = 10n
+    totn = 100n
     w = Whiten(nin, nout, lookback=10n, method=:zca)
     for i=1:totn
         learn!(w, x[:,mod1(i,n)])

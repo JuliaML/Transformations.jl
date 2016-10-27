@@ -2,15 +2,16 @@ __precompile__(true)
 
 module Transformations
 
-using Reexport
-@reexport using LearnBase
+# using Reexport
 using RecipesBase
 
 import CatViews: CatView, splitview
 import Base: rand
+using LearnBase
 import LearnBase: transform, transform!,
                   grad, grad!, addgrad!,
-                  value, params, update!
+                  value, params, update!,
+                  learn!
 # import StatsBase: logistic, logit
 import OnlineStats
 import OnlineStats: weight, Weight, BoundedEqualWeight
