@@ -49,10 +49,7 @@ function transform!{T}(layer::LayerNorm{T})
 
     # normalize the layer
     layer.μ = mean(y)
-    layer.σ = std(y)
-    if layer.σ == zero(T)
-        layer.σ = one(T)
-    end
+    layer.σ = max(std(y), 1e-8)
 
     # mult by g and add b
     for o=1:layer.nout

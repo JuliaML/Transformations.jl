@@ -109,7 +109,7 @@ function transform_Σ!(mv::MvNormalTransformation, Σ)
 end
 
 # compute_σ(ϕᵢ) = exp(clamp(ϕᵢ, -1e1, 1e1))
-compute_σ(ϕᵢ) = ϕᵢ
+compute_σ(ϕᵢ) = (ϕᵢ < 0 ? min(ϕᵢ,-1e-5) : max(ϕᵢ, 1e-5))
 
 
 
