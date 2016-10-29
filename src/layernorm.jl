@@ -49,6 +49,7 @@ function transform!{T}(layer::LayerNorm{T})
 
     # normalize the layer
     layer.μ = mean(y)
+    isnan(layer.μ) && @show layer y x w g b map(extrema, (y, x, w, g, b))
     layer.σ = max(std(y), 1e-8)
 
     # mult by g and add b
