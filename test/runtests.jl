@@ -8,6 +8,21 @@ using Distributions
 using StochasticOptimization.Iteration
 import MultivariateStats
 
+# for reproducibility
+srand(1)
+
+function test_gradient(t::Learnable)
+    perr, xerr = Transformations.check_gradient(t)
+    if maximum(abs(perr)) > 1e-10
+        @show perr extrema(perr)
+        @test false
+    end
+    if maximum(abs(xerr)) > 1e-10
+        @show xerr extrema(xerr)
+        @test false
+    end
+end
+
 @testset "PCA" begin
     nin, nout = 4, 2
     n = 50
@@ -273,6 +288,8 @@ end
         output = transform!(chain, input)
         # @show output
         @test manual_output == output
+
+        test_gradient(chain)
     end
 end
 

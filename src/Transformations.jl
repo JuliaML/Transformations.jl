@@ -164,4 +164,61 @@ include("whiten.jl")
 
 # ----------------------------------------------------------------
 
+function check_gradient(t::Learnable, x = rand(input_length(t)); ϵ::Number = 1e-4)
+    # first get: y = f(x)
+    y = transform!(t, x)
+
+    #= note: we assume the loss is:
+        L = sum(y)
+        ∂L/∂yᵢ = 1
+    =#
+    L = sum(y)
+
+    # compute the gradient
+    grad!(t, ones(output_length(t)))
+    Θ = copy(params(t))
+    ∇ = grad(t)
+
+    # now add a slight perterbation and check that it approximately
+    # matches the analytic gradient
+    Θ̃ = params(t)
+    perr = zeros(length(Θ))
+    for i=1:length(Θ)
+        Θ̃[i] = Θ[i] + ϵ
+        y = transform!(t, x)
+        L1 = sum(y)
+        Θ̃[i] = Θ[i] - ϵ
+        y = transform!(t, x)
+        L2 = sum(y)
+        denom = 2ϵ * ∇[i]
+        perr[i] = denom - (L1 - L2)
+        if denom != 0
+            perr[i] /= denom
+        end
+    end
+    # err
+
+    x = copy(x)
+    x̃ = input_value(t)
+    ∇x = input_grad(t)
+    xerr = zeros(length(x))
+    for i=1:length(x)
+        x̃[i] = x[i] + ϵ
+        y = transform!(t, x̃)
+        L1 = sum(y)
+        x̃[i] = x[i] - ϵ
+        y = transform!(t, x̃)
+        L2 = sum(y)
+        # xerr[i] = (L1 - L2) - 2ϵ * ∇x[i]
+        denom = 2ϵ * ∇x[i]
+        xerr[i] = denom - (L1 - L2)
+        if denom != 0
+            xerr[i] /= denom
+        end
+    end
+    perr, xerr
+end
+
+# ----------------------------------------------------------------
+
 end # module
