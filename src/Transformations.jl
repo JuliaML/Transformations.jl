@@ -164,7 +164,7 @@ include("whiten.jl")
 
 # ----------------------------------------------------------------
 
-function check_gradient(t::Learnable, x = rand(input_length(t)); ϵ::Number = 1e-4)
+function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Number = 1e-4)
     # first get: y = f(x)
     y = transform!(t, x)
 
@@ -173,30 +173,38 @@ function check_gradient(t::Learnable, x = rand(input_length(t)); ϵ::Number = 1e
         ∂L/∂yᵢ = 1
     =#
     L = sum(y)
-
-    # compute the gradient
     grad!(t, ones(output_length(t)))
-    Θ = copy(params(t))
-    ∇ = grad(t)
 
     # now add a slight perterbation and check that it approximately
     # matches the analytic gradient
-    Θ̃ = params(t)
-    perr = zeros(length(Θ))
-    for i=1:length(Θ)
-        Θ̃[i] = Θ[i] + ϵ
-        y = transform!(t, x)
-        L1 = sum(y)
-        Θ̃[i] = Θ[i] - ϵ
-        y = transform!(t, x)
-        L2 = sum(y)
-        denom = 2ϵ * ∇[i]
-        perr[i] = denom - (L1 - L2)
-        if denom != 0
-            perr[i] /= denom
+
+    if typeof(t) <: Learnable
+        # compute the gradient
+        Θ = copy(params(t))
+        ∇ = grad(t)
+
+        Θ̃ = params(t)
+        perr = zeros(length(Θ))
+        for i=1:length(Θ)
+            Θ̃[i] = Θ[i] + ϵ
+            y = transform!(t, x)
+            L1 = sum(y)
+            Θ̃[i] = Θ[i] - ϵ
+            y = transform!(t, x)
+            L2 = sum(y)
+            # denom = 2ϵ * ∇[i]
+            # perr[i] = (L1 - L2) - denom
+            true_grad = (L1 - L2) / (2ϵ)
+            perr[i] = true_grad - ∇[i]
+            @show L L1 L2 true_grad ∇[i] perr[i]
+            if true_grad != 0
+                perr[i] /= true_grad
+            end
+            @show perr[i]
         end
+    else
+        perr = zeros(0)
     end
-    # err
 
     x = copy(x)
     x̃ = input_value(t)
@@ -209,12 +217,18 @@ function check_gradient(t::Learnable, x = rand(input_length(t)); ϵ::Number = 1e
         x̃[i] = x[i] - ϵ
         y = transform!(t, x̃)
         L2 = sum(y)
-        # xerr[i] = (L1 - L2) - 2ϵ * ∇x[i]
-        denom = 2ϵ * ∇x[i]
-        xerr[i] = denom - (L1 - L2)
-        if denom != 0
-            xerr[i] /= denom
+        # denom = 2ϵ * ∇x[i]
+        # xerr[i] = (L1 - L2) - denom
+        # if denom != 0
+        #     xerr[i] /= denom
+        # end
+        true_grad = (L1 - L2) / (2ϵ)
+        xerr[i] = true_grad - ∇x[i]
+        @show L L1 L2 true_grad ∇x[i] xerr[i]
+        if true_grad != 0
+            xerr[i] /= true_grad
         end
+        @show xerr[i]
     end
     perr, xerr
 end
