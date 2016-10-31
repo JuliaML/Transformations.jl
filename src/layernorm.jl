@@ -98,15 +98,22 @@ function grad!{T}(layer::LayerNorm{T})
         # dz∇yₒ = ∇y[o] * (D - one(T) - zₒ^2) / (D * layer.σ̂)
         for i=1:layer.nin
             # ∇w[o,i] = g[o] * x[i] * dz∇yₒ
-            ∇x[i] += ∇y[o] * g[o] * (w[o,i] - w̄[i]) / layer.σ̂
+            # ∇x[i] += ∇y[o] * g[o] * (w[o,i] - w̄[i]) / layer.σ̂
             # ∇x[i] += (g[o] * w[o,i] - ḡ * w̄[i]) * ∇y[o] / layer.σ̂
 
-            sump = zero(T)
+            sumw = zero(T)
+            sumx = zero(T)
             for p=1:layer.nout
                 zp = (y[p] - b[p]) / g[p]
-                sump += g[p] * zp * (aₒ - layer.μ * (2 - Dinv)) / (layer.σ̂ * (D - one(T)))
+                ap = zp * layer.σ̂ + layer.μ
+                dzda = (p==o ? one(T) : zero(T)) -
+                        Dinv -
+                        zₒ * (ap - layer.μ * (T(2) - Dinv)) / (layer.σ̂ * (D-one(T)))
+                sumx += w[o,i] * dzda
+                # sumw += g[p] * zp * (aₒ - layer.μ * (2 - Dinv)) / (layer.σ̂ * (D - one(T)))
             end
-            ∇w[o,i] = ∇y[o] * x[i] * (one(T) + sump - ḡ)
+            ∇x[i] += ∇y[o] * g[o] * sumx / layer.σ̂
+            # ∇w[o,i] = ∇y[o] * x[i] * (one(T) + sumw - ḡ)
         end
     end
 
