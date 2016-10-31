@@ -69,14 +69,6 @@ function Base.empty!{T}(o::Whiten{T})
     o
 end
 
-function smooth!{T,N}(a::AbstractArray{T,N}, b::AbstractArray{T,N}, λ::T)
-    @assert length(a) == length(b)
-    oml = one(λ) - λ
-    @inbounds for i=1:length(a)
-        a[i] = λ * b[i] + oml * a[i]
-    end
-end
-
 function center!{T<:AbstractArray}(x::T, x̄::T)
     for i=1:length(x)
         x[i] -= x̄[i]

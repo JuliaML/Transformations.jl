@@ -1,147 +1,114 @@
 
 #=
-Implements Layer Normalization from https://arxiv.org/abs/1607.06450:
+Implements an online version of Layer Normalization from https://arxiv.org/abs/1607.06450:
     Ba et al (2016): Layer Normalization
 
-The rotated input (wx) is normalized ((wx .- mean(wx)) ./ std(wx)) using a learnable matrix w,
-and then re-scaled and shifted with learnable params gain (g) and bias (b).
+The input a is normalized ((a .- μ) ./ σ), and then re-scaled and shifted
+with learnable params gain (g) and bias (b).
 =#
 
-# output = wx + b
-type LayerNorm{T,P<:Params} <: Learnable
-    nin::Int
-    nout::Int
-    μ::T
-    σ::T
-    σ̂::T  # the clamped version
-    input::Node{:input,T,1}
-    output::Node{:output,T,1}
-    params::P
+#=
+Input is a, output is y (same size as a):
+    y = g ∘ z + b
+    z = (a - μₜ) / σₜ
+=#
+type LayerNorm{T,P<:Params,W<:Weight} <: Learnable
+    n::Int  # maps n --> n
+    m::T  # this period's mean(aₜ)
+    μ::T  # running average of m = mean(aₜ)
+    σ::T  # running average of s = std(aₜ)
+    σ̂::T  # the clamped version or σ
+    αₜ::T
+    wgt::W
+    z::Vector{T}
+    input::Node{:input,T,1}    # a
+    output::Node{:output,T,1}  # y
+    params::P                  # holds g and b
 end
 
-function LayerNorm{T}(::Type{T}, nin::Int, nout::Int,
-                    θ::AbstractVector = zeros(T, nout*(nin+2)),
-                    ∇::AbstractVector = zeros(T, nout*(nin+2)))
-    input = Node(:input, zeros(T, nin))
-    output = Node(:output, zeros(T, nout))
-    params = Params(θ, ∇, ((nout,nin), (nout,), (nout,)))
-    w, g, b = params.views
-    initialize_weights!(w)
+function LayerNorm{T}(::Type{T}, n::Int,
+                    θ::AbstractVector = zeros(T, 2n),
+                    ∇::AbstractVector = zeros(T, 2n);
+                    lookback::Int = 100,
+                    α::Float64 = NaN,
+                    wgt::Weight =  BoundedEqualWeight(isnan(α) ? lookback : α)
+                    )
+    input = Node(:input, zeros(T, n))
+    output = Node(:output, zeros(T, n))
+    params = Params(θ, ∇, ((n,), (n,)))
+    g, b = params.views
     fill!(g, one(T))
     fill!(b, zero(T))
-    LayerNorm(nin, nout, zero(T), one(T), one(T), input, output, params)
+    LayerNorm(n, zero(T), zero(T), one(T), one(T), zero(T), wgt, zeros(T,n), input, output, params)
 end
-LayerNorm(nin::Int, nout::Int, args...) = LayerNorm(Float64, nin, nout, args...)
+LayerNorm(n::Int, args...; kw...) = LayerNorm(Float64, n, args...; kw...)
 
 function Base.show(io::IO, t::LayerNorm)
-    print(io, "LayerNorm{$(t.nin)-->$(t.nout), mu=$(t.μ), sigma=$(t.σ)}")
+    print(io, "LayerNorm{n=$(t.n), mu=$(t.μ), sigma=$(t.σ)}")
 end
 
 # compute output = wx + b
 function transform!{T}(layer::LayerNorm{T})
-    w, g, b = layer.params.views
-    x = layer.input.val
+    g, b = layer.params.views
+    a = layer.input.val
     y = layer.output.val
 
-    # first set y = wx
-    @inbounds for o=1:layer.nout
-        y[o] = sum(w[o,i] * x[i] for i=1:layer.nin)
-    end
+    # update the αₜ weighting
+    OnlineStats.updatecounter!(layer.wgt)
+    layer.αₜ = weight(layer.wgt)
 
     # normalize the layer
-    layer.μ = mean(y)
-    isnan(layer.μ) && @show layer y x w g b map(extrema, (y, x, w, g, b))
-    # layer.σ = sqrt(sum((y[o]-layer.μ)^2 for o=1:layer.nout) / layer.nout)
-    layer.σ = std(y)
+    # TODO: μ/σ should be weighted avgs using BoundedEqualWeight
+    layer.m = mean(a)
+    layer.μ = layer.αₜ * layer.m + (one(T) - layer.αₜ) * layer.μ
+    if isnan(layer.μ)
+        warn("layer.μ is NaN:")
+        @show layer a g b map(extrema, (a, g, b))
+    end
+    layer.σ = layer.αₜ * std(a) + (one(T) - layer.αₜ) * layer.μ
     layer.σ̂ = if layer.σ == 0
         @show layer.μ, layer.σ, layer.σ̂
         1e-10
     else
         layer.σ
     end
-    # layer.σ̂ = max(layer.σ, 1e-8)
 
     # mult by g and add b
-    @inbounds for o=1:layer.nout
-        zₒ = (y[o] - layer.μ) / layer.σ̂
-        y[o] = g[o] * zₒ + b[o]
+    @inbounds for o=1:layer.n
+        layer.z[o] = (a[o] - layer.μ) / layer.σ̂
+        y[o] = g[o] * layer.z[o] + b[o]
     end
     y
 end
 
 function grad!{T}(layer::LayerNorm{T})
-    w, g, b = layer.params.views
-    ∇w, ∇g, ∇b = layer.params.∇_views
-    x = layer.input.val
+    g, b = layer.params.views
+    ∇g, ∇b = layer.params.∇_views
+    a = layer.input.val
     y = layer.output.val
-    ∇x = layer.input.∇
+    ∇a = layer.input.∇
     ∇y = layer.output.∇
 
-    D = layer.nout
+    D = layer.n
     Dinv = one(T) / D
-    @show layer.μ layer.σ layer.σ̂
+    Dm1 = D - one(T)
+    # @show layer.μ, layer.σ, layer.σ̂
 
-    fill!(∇x, zero(T))
-    # fill!(∇w, one(T))
-    w̄ = mean(w, 1)
-    ḡ = mean(g)
-    for o=1:layer.nout
-        # aₒ = sum(w[o,i] * x[i] for i=1:layer.nin)
-        # zₒ = (aₒ - layer.μ) / layer.σ̂
+    # TODO: ∇a, ∇g
+    fill!(∇a, zero(T))
+    for o=1:layer.n
+        # ∇g
+        ∇g[o] = ∇y[o] * layer.z[o]
 
-        zₒ = (y[o] - b[o]) / g[o]
-        aₒ = zₒ * layer.σ̂ + layer.μ
-        ∇g[o] = zₒ * ∇y[o]
-
-        # dz∇yₒ = ∇y[o] * (D-one(T)) * (Dinv - zₒ^2) / layer.σ̂
-        # dz∇yₒ = ∇y[o] * ((D-one(T)) / (D * layer.σ̂)) * (one(T) - zₒ^2 / D)
-        # dz∇yₒ = ∇y[o] * (D - one(T) - zₒ^2) / (D * layer.σ̂)
-        for i=1:layer.nin
-            # ∇w[o,i] = g[o] * x[i] * dz∇yₒ
-            # ∇x[i] += ∇y[o] * g[o] * (w[o,i] - w̄[i]) / layer.σ̂
-            # ∇x[i] += (g[o] * w[o,i] - ḡ * w̄[i]) * ∇y[o] / layer.σ̂
-
-            sumw = zero(T)
-            sumx = zero(T)
-            for p=1:layer.nout
-                zp = (y[p] - b[p]) / g[p]
-                ap = zp * layer.σ̂ + layer.μ
-                dzda = (p==o ? one(T) : zero(T)) -
-                        Dinv -
-                        zₒ * (ap - layer.μ * (T(2) - Dinv)) / (layer.σ̂ * (D-one(T)))
-                sumx += w[o,i] * dzda
-                # sumw += g[p] * zp * (aₒ - layer.μ * (2 - Dinv)) / (layer.σ̂ * (D - one(T)))
-            end
-            ∇x[i] += ∇y[o] * g[o] * sumx / layer.σ̂
-            # ∇w[o,i] = ∇y[o] * x[i] * (one(T) + sumw - ḡ)
+        # ∇a
+        base_dzₒdaₚ = Dinv - layer.αₜ * layer.z[o] * (layer.μ - layer.m) / layer.σ̂
+        for p=1:layer.n
+            dzₒdaₚ = base_dzₒdaₚ + layer.z[o] * layer.z[p] / Dm1
+            dzₒdaₚ = (o==p ? one(T) : zero(T)) - layer.αₜ * dzₒdaₚ
+            dzₒdaₚ /= layer.σ̂
+            ∇a[p] += ∇y[o] * g[o] * dzₒdaₚ
         end
     end
-
-    for idx in eachindex(∇w)
-        ∇w[idx] /= layer.σ̂
-    end
-
-    # fill!(∇g, zero(T))
-    # @inbounds for i=1:layer.nin
-    #     ∇xᵢ = zero(T)
-    #     for o=1:layer.nout
-    #         ∇xᵢ += if layer.σ == layer.σ̂
-    #             # (g[o] * (w[o,i] - Dinv) / layer.σ̂ -
-    #             # Dinv * y[o] * (x[i] + layer.μ * (Dinv-T(2))) / sqrt(layer.σ̂)) / layer.σ̂
-    #
-    #         else
-    #             g[o] * w[o,i] / layer.σ̂
-    #         end * ∇y[o]
-    #         ∇w[o,i] = g[o] * x[i] * ∇y[o] / layer.σ̂
-    #         # ∇g[o] += ((x[i] * w[o,i] - layer.μ) / layer.σ̂) * ∇y[o]
-    #         ∇g[o] += x[i] * w[o,i]
-    #     end
-    #     ∇x[i] = ∇xᵢ
-    # end
-    #
-    # @inbounds for o=1:layer.nout
-    #     ∇g[o] = ∇y[o] * (∇g[o] - layer.μ) / layer.σ̂
-    # end
 
     # ∇b
     copy!(∇b, ∇y)

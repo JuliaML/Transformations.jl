@@ -89,7 +89,13 @@ function nnet(nin::Int, nout::Int, nh = [],
     num_affine = length(ns) - 1
     layers = []
     for i=1:num_affine
-        push!(layers, (layernorm ? LayerNorm : Affine)(ns[i], ns[i+1]))
+        # push!(layers, (layernorm ? LayerNorm : Affine)(ns[i], ns[i+1]))
+        if layernorm
+            push!(layers, Linear(ns[i], ns[i+1]))
+            push!(layers, LayerNorm(ns[i+1]))
+        else
+            push!(layers, Affine(ns[i], ns[i+1]))
+        end
         if inner_activation != :identity && i < num_affine
             push!(layers, Activation(inner_activation, ns[i+1]))
         end

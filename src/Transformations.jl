@@ -33,6 +33,7 @@ export
     # Learnable,
     Node,
     link_nodes!,
+    Linear,
     Affine,
     LayerNorm,
     Activation,
@@ -148,10 +149,20 @@ function initialize_bias!{T}(b::AbstractArray{T})
     fill!(b, zero(T))
 end
 
+
+function smooth!{T,N}(a::AbstractArray{T,N}, b::AbstractArray{T,N}, λ::T)
+    @assert length(a) == length(b)
+    oml = one(λ) - λ
+    @inbounds for i=1:length(a)
+        a[i] = λ * b[i] + oml * a[i]
+    end
+end
+
 # ----------------------------------------------------------------
 
 include("params.jl")
 include("nodes.jl")
+include("linear.jl")
 include("affine.jl")
 include("layernorm.jl")
 include("activations.jl")
@@ -164,7 +175,7 @@ include("whiten.jl")
 
 # ----------------------------------------------------------------
 
-function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Number = 1e-4)
+function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Number = 1e-5)
     # first get: y = f(x)
     y = transform!(t, x)
 
@@ -175,7 +186,7 @@ function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Numbe
     L = sum(y)
     grad!(t, ones(output_length(t)))
 
-    @show L x y t
+    # @show L x y t
 
     # now add a slight perterbation and check that it approximately
     # matches the analytic gradient
@@ -184,7 +195,7 @@ function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Numbe
         # compute the gradient
         Θ = copy(params(t))
         ∇ = grad(t)
-        @show Θ ∇
+        # @show Θ ∇
 
         Θ̃ = params(t)
         perr = zeros(length(Θ))
@@ -195,13 +206,11 @@ function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Numbe
             Θ̃[i] = Θ[i] - ϵ
             y = transform!(t, x)
             L2 = sum(y)
-            # denom = 2ϵ * ∇[i]
-            # perr[i] = (L1 - L2) - denom
+
             true_grad = (L1 - L2) / (2ϵ)
             perr[i] = true_grad - ∇[i]
-            # dump(t)
-            @show i, L1, L2, true_grad, ∇[i], perr[i]
-            if true_grad != 0
+            # @show i, L1, L2, true_grad, ∇[i], perr[i]
+            if abs(true_grad) > 1e-8
                 perr[i] /= true_grad
             end
             @show perr[i]
@@ -221,15 +230,11 @@ function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Numbe
         x̃[i] = x[i] - ϵ
         y = transform!(t, x̃)
         L2 = sum(y)
-        # denom = 2ϵ * ∇x[i]
-        # xerr[i] = (L1 - L2) - denom
-        # if denom != 0
-        #     xerr[i] /= denom
-        # end
+
         true_grad = (L1 - L2) / (2ϵ)
         xerr[i] = true_grad - ∇x[i]
-        @show L L1 L2 true_grad ∇x[i] xerr[i]
-        if true_grad != 0
+        # @show L L1 L2 true_grad ∇x[i] xerr[i]
+        if abs(true_grad) > 1e-8
             xerr[i] /= true_grad
         end
         @show xerr[i]
