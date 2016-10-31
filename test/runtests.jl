@@ -244,7 +244,9 @@ end
             # @test ∇x ≈ w' * (dl .* g)
         end
 
-        test_gradient(a, 1e-10)
+        g[:] = rand(nout)
+
+        test_gradient(a, 1e-5)
     end
 end
 

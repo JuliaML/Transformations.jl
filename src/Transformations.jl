@@ -175,6 +175,8 @@ function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Numbe
     L = sum(y)
     grad!(t, ones(output_length(t)))
 
+    @show L x y t
+
     # now add a slight perterbation and check that it approximately
     # matches the analytic gradient
 
@@ -182,6 +184,7 @@ function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Numbe
         # compute the gradient
         Θ = copy(params(t))
         ∇ = grad(t)
+        @show Θ ∇
 
         Θ̃ = params(t)
         perr = zeros(length(Θ))
@@ -196,7 +199,8 @@ function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Numbe
             # perr[i] = (L1 - L2) - denom
             true_grad = (L1 - L2) / (2ϵ)
             perr[i] = true_grad - ∇[i]
-            @show L L1 L2 true_grad ∇[i] perr[i]
+            # dump(t)
+            @show i, L1, L2, true_grad, ∇[i], perr[i]
             if true_grad != 0
                 perr[i] /= true_grad
             end
