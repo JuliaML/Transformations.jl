@@ -63,7 +63,7 @@ function transform!{T}(layer::LayerNorm{T})
     layer.μ = layer.αₜ * layer.m + (one(T) - layer.αₜ) * layer.μ
     if isnan(layer.μ)
         warn("layer.μ is NaN:")
-        @show layer a g b map(extrema, (a, g, b))
+        @show layer a g b map(extrema, (a, g, b)) layer.wgt.nobs
     end
     layer.σ = layer.αₜ * std(a) + (one(T) - layer.αₜ) * layer.μ
     layer.σ̂ = if layer.σ == 0

@@ -32,6 +32,7 @@ output_length(act::Activation) = act.n
 
 # ----------------------------------------------------------------------------
 
+const _exp_threshold = 20
 
 # identity: nothing to do, since we linked the input to output
 transform!(act::Activation{:identity}) = act.output.val
@@ -48,13 +49,17 @@ logistic′{T<:Number}(x::T, y::T) = y * (one(T) - y)
 tanh′{T<:Number}(x::T, y::T) = one(T) - y^2
 
 softsign{T<:Number}(x::T) = x / (one(T) + abs(x))
-softsign′{T<:Number}(x::T, y::T) = one(T) / (one(T) + abs(x))^2
+softsign′{T<:Number}(x::T, y::T) = (one(T) / (one(T) + abs(x)))^2
 
 relu{T<:Number}(x::T) = max(zero(T), x)
 relu′{T<:Number}(x::T, y::T) = x >= zero(T) ? one(T) : zero(T)
 
-softplus{T<:Number}(x::T) = log(one(T) + exp(x))
-softplus′{T<:Number}(x::T, y::T) = logistic(x)
+# softplus{T<:Number}(x::T) = log(one(T) + exp(x))
+# softplus′{T<:Number}(x::T, y::T) = logistic(x)
+
+# set to f(x)=x, f'(x)=1 when x is too big due to floating point math
+softplus{T<:Number}(x::T) = x > _exp_threshold ? x : log(one(T) + exp(x))
+softplus′{T<:Number}(x::T, y::T) = x > _exp_threshold ? one(T) : logistic(x)
 
 sinusoid{T<:Number}(x::T) = sin(x)
 sinusoid′{T<:Number}(x::T, y::T) = cos(x)
