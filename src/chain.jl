@@ -16,29 +16,15 @@ Chain(ts::Transformation...) = Chain(Float64, ts...)
 Chain{T}(::Type{T}, ts::Transformation...) = Chain(T, convert(Array{Transformation}, collect(ts)))
 
 function Chain{T,TR<:Transformation}(::Type{T}, ts::AbstractVector{TR})
-    # transforms = vcat(t1, ts...)
     link_nodes!(ts)
-    # transforms = Array(Transformation, length(ts)+1)
-    # transforms[1] = t1
-    # for (i,t) in enumerate(ts)
-    #     # if i > 1
-    #     link_nodes!(transforms[i].output, t.input)
-    #     transforms[i+1] = t
-    #     # end
-    # end
-
-    params = consolidate_params(T, ts)
-    chain = Chain(
+    Chain(
         input_length(ts[1]),
         output_length(ts[end]),
         input_node(ts[1]),
         output_node(ts[end]),
         ts,
-        params
+        consolidate_params(T, ts)
     )
-    # link_nodes!(transforms[1].input, chain.input)
-    # link_nodes!(transforms[end].output, chain.output)
-    chain
 end
 
 Base.getindex(chain::Chain, i) = chain.ts[i]
@@ -71,37 +57,26 @@ end
 # end
 
 # now that it's set up, just go forward to transform, or backwards to backprop
-transform!(chain::Chain) = (foreach(transform!, chain.ts); chain.output.val)
-grad!(chain::Chain) = foreach(grad!, reverse(chain.ts))
+
+function transform!(chain::Chain)
+    for (i,t) in enumerate(chain.ts)
+        i > 1 && transform!(input_node(t))
+        transform!(t)
+    end
+    output_value(chain)
+end
+
+function grad!(chain::Chain)
+    for (i,t) in enumerate(reverse(chain.ts))
+        i > 1 && grad!(output_node(t))
+        grad!(t)
+    end
+    output_value(chain)
+end
+
+# transform!(chain::Chain) = (foreach(transform!, chain.ts); chain.output.val)
+# grad!(chain::Chain) = foreach(grad!, reverse(chain.ts))
 
 function reset_params!{T}(chain::Chain{T}, θ::AbstractVector, ∇::AbstractVector)
     chain.params = consolidate_params(T, chain.ts, θ=θ, ∇=∇)
-end
-
-# ---------------------------------------------------------------------
-
-function nnet(nin::Int, nout::Int, nh = [],
-              inner_activation = :tanh,
-              final_activation = :identity;
-              layernorm = true,
-              kw...)
-    ns = vcat(nin, nh, nout)
-    num_affine = length(ns) - 1
-    layers = []
-    for i=1:num_affine
-        # push!(layers, (layernorm ? LayerNorm : Affine)(ns[i], ns[i+1]))
-        if layernorm
-            push!(layers, Linear(ns[i], ns[i+1]))
-            push!(layers, LayerNorm(ns[i+1]; kw...))
-        else
-            push!(layers, Affine(ns[i], ns[i+1]))
-        end
-        if inner_activation != :identity && i < num_affine
-            push!(layers, Activation(inner_activation, ns[i+1]))
-        end
-    end
-    if final_activation != :identity
-        push!(layers, Activation(final_activation, nout))
-    end
-    Chain(layers...)
 end

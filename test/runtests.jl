@@ -324,6 +324,13 @@ end
         @test chain.ts[1].input.val === chain.input.val
         @test chain.ts[end].output.val === chain.output.val
 
+        y = copy(transform!(chain, input))
+        x = copy(input)
+        for t in chain.ts
+            x = copy(transform!(t, x))
+        end
+        @test y ≈ x
+
         # first compute the chain of transformations manually,
         manual_output = input
         for t in chain.ts
@@ -338,6 +345,62 @@ end
 
         test_gradient(chain)
     end
+end
+
+@testset "ResidualLayer" begin
+    n = 3
+    f = nnet(3, 3, [4], layernorm=false)
+    t = ResidualLayer(n, f)
+    # @show t
+    @test f === t.f
+
+    x = rand(n)
+    x2 = copy(x)
+    y = copy(transform!(t, x))
+    @test x == x2
+    y2 = transform!(t, x)
+    @test y == y2
+    @test y ≈ transform!(f, x) + x2
+
+    ∇y = rand(n)
+    grad!(t, ∇y)
+    @test output_grad(f) == ∇y
+
+    test_gradient(t)
+end
+
+
+@testset "resnet" begin
+    nin, nout = 3, 2
+    nblocks = 2
+    t = resnet(nin, nout, nblocks, nh=[2], layernorm=false)
+    # @show t
+
+    @test length(t.ts) == nblocks+1
+    @test isa(t.ts[end], Affine)
+    for i=1:nblocks
+        @test isa(t.ts[i], ResidualLayer)
+    end
+
+    x = rand(nin)
+    y = copy(transform!(t, x))
+
+    x̂ = copy(transform!(t.ts[1], x))
+    for i=2:nblocks+1
+        x̂ = transform!(t.ts[i])
+    end
+    @test y ≈ x̂
+    # @test y ≈ transform!(t.ts[3],
+    #             copy(transform!(t.ts[2],
+    #                 copy(transform!(t.ts[1], x)))
+    #             )
+    #           )
+
+    ∇y = rand(nout)
+    grad!(t, ∇y)
+    @test output_grad(t) == ∇y
+
+    test_gradient(t)
 end
 
 @testset "ConvFilter" begin

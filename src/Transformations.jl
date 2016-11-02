@@ -42,6 +42,8 @@ export
     Whiten,
     Chain,
     nnet,
+    ResidualLayer,
+    resnet,
     ConvFilter,
     ConvLayer,
     MaxPooling,
@@ -169,6 +171,7 @@ include("affine.jl")
 include("layernorm.jl")
 include("activations.jl")
 include("chain.jl")
+include("nnet.jl")
 include("convolutions.jl")
 include("pooling.jl")
 include("functions.jl")
@@ -215,7 +218,7 @@ function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Numbe
             if abs(true_grad) > 1e-8
                 perr[i] /= true_grad
             end
-            @show perr[i]
+            # @show perr[i]
         end
     else
         perr = zeros(0)
@@ -239,7 +242,7 @@ function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Numbe
         if abs(true_grad) > 1e-8
             xerr[i] /= true_grad
         end
-        @show xerr[i]
+        # @show xerr[i]
     end
     perr, xerr
 end
