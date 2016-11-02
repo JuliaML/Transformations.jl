@@ -31,7 +31,7 @@ export
     totalcost,
 
     # Learnable,
-    Node,
+    # Node,
     link_nodes!,
     Linear,
     Affine,
@@ -50,8 +50,8 @@ export
     NonDifferentiable,
     OnceDifferentiable,
     TwiceDifferentiable,
-    MvNormalTransformation,
-    Params
+    MvNormalTransformation
+    # Params
 
 function zero!{T,N}(v::AbstractArray{T,N})
     for i in eachindex(v)
@@ -165,15 +165,15 @@ end
 include("params.jl")
 include("nodes.jl")
 include("linear.jl")
-# include("affine.jl")
-# include("layernorm.jl")
+include("affine.jl")
+include("layernorm.jl")
 include("activations.jl")
-# include("chain.jl")
-# include("convolutions.jl")
-# include("pooling.jl")
-# include("functions.jl")
-# include("distributions.jl")
-# include("whiten.jl")
+include("chain.jl")
+include("convolutions.jl")
+include("pooling.jl")
+include("functions.jl")
+include("distributions.jl")
+include("whiten.jl")
 
 # ----------------------------------------------------------------
 

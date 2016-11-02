@@ -21,8 +21,8 @@ type LayerNorm{T,P<:Params,W<:Weight} <: Learnable
     αₜ::T
     wgt::W
     z::Vector{T}
-    input::Node{:input,T,1}    # a
-    output::Node{:output,T,1}  # y
+    input::SumNode{T,1}    # a
+    output::OutputNode{T,1}  # y
     params::P                  # holds g and b
 end
 
@@ -33,13 +33,17 @@ function LayerNorm{T}(::Type{T}, n::Int,
                     α::Float64 = NaN,
                     wgt::Weight =  BoundedEqualWeight(isnan(α) ? lookback : α)
                     )
-    input = Node(:input, zeros(T, n))
-    output = Node(:output, zeros(T, n))
+    input = InputNode(T, n)
+    output = OutputNode(T, n)
     params = Params(θ, ∇, ((n,), (n,)))
     g, b = params.views
     fill!(g, one(T))
     fill!(b, zero(T))
-    LayerNorm(n, zero(T), zero(T), one(T), one(T), zero(T), wgt, zeros(T,n), input, output, params)
+    LayerNorm(n, zero(T), zero(T),
+        one(T), one(T), zero(T),
+        wgt, zeros(T,n),
+        input, output, params
+    )
 end
 LayerNorm(n::Int, args...; kw...) = LayerNorm(Float64, n, args...; kw...)
 
@@ -67,7 +71,7 @@ function transform!{T}(layer::LayerNorm{T})
     end
     layer.σ = layer.αₜ * std(a) + (one(T) - layer.αₜ) * layer.μ
     layer.σ̂ = if layer.σ == 0
-        @show layer.μ, layer.σ, layer.σ̂
+        # @show layer.μ, layer.σ, layer.σ̂
         1e-10
     else
         layer.σ

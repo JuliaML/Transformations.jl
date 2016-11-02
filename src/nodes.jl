@@ -121,9 +121,21 @@ forward!{T,N}(val::AbstractArray{T,N}, node::ProdNode{T,N}) = (node.val .*= val)
 #     innode.val = outnode.val
 #     innode.∇ = outnode.∇
 # end
-#
-# function link_nodes!(ts::Transformation...)
-#     for i=2:length(ts)
-#         link_nodes!(output_node(ts[i-1]), input_node(ts[i]))
-#     end
-# end
+
+function link_nodes!(fromnode::OutputNode, tonode::InputNode)
+    push!(fromnode.tonodes, tonode)
+    push!(tonode.fromnodes, fromnode)
+    return
+end
+
+function link_nodes!(ts::Transformation...)
+    for i=2:length(ts)
+        link_nodes!(output_node(ts[i-1]), input_node(ts[i]))
+    end
+end
+
+function link_nodes!{T<:Transformation}(ts::AbstractVector{T})
+    for i=2:length(ts)
+        link_nodes!(output_node(ts[i-1]), input_node(ts[i]))
+    end
+end

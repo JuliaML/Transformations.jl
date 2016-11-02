@@ -31,8 +31,8 @@ type Whiten{T,METHOD,W<:Weight} <: PreprocessStep
     V::Matrix{T}    # (nout x nin)
     e::Vector{T}    # (nout x 1)
     x̄::Vector{T}    # (nin x 1) mean(x)
-    input::Node{:input,T,1}
-    output::Node{:output,T,1}
+    input::SumNode{T,1}
+    output::OutputNode{T,1}
  end
  Whiten(nin::Int, nout::Int; kw...) = Whiten(Float64, nin, nout; kw...)
 
@@ -56,8 +56,8 @@ function Whiten{T}(::Type{T},
         zeros(T,nout,nin),
         zeros(T,nout),
         zeros(T,nin),
-        Node(:input, zeros(T, nin)),
-        Node(:output, zeros(T, nout))
+        InputNode(T, nin),
+        OutputNode(T, nout)
     )
 end
 

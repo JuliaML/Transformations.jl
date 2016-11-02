@@ -27,8 +27,8 @@ type MvNormalTransformation{T,DIST<:MvNormal} <: Transformation
     nμ::Int
     nU::Int
     z̄::Vector{T}         # scratch space to avoid allocation in grad!
-    input::Node{:input,T,1}    # the sufficient stats: ϕ = vec(μ, U)
-    output::Node{:output,T,1}  # the random sample
+    input::SumNode{T,1}    # the sufficient stats: ϕ = vec(μ, U)
+    output::OutputNode{T,1}  # the random sample
 end
 
 function MvNormalTransformation{T}(::Type{T}, args...)
@@ -47,8 +47,8 @@ function MvNormalTransformation{T}(::Type{T}, args...)
         nμ,
         nU,
         zeros(T, n),
-        Node(:input, zeros(T, nμ+nU)),
-        Node(:output, zeros(T, n))
+        InputNode(T, nμ+nU),
+        OutputNode(T, n)
     )
 end
 MvNormalTransformation(args...) = MvNormalTransformation(Float64, args...)

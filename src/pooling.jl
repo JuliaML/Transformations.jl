@@ -1,7 +1,7 @@
 
 immutable MaxPooling{T,N} <: Transformation
-    input::Node{:input,T,N}
-    output::Node{:output,T,N}
+    input::SumNode{T,N}
+    output::OutputNode{T,N}
     stride::NTuple{N,Int}
 end
 MaxPooling(args...) = MaxPooling(Float64, args...)
@@ -9,8 +9,8 @@ MaxPooling(args...) = MaxPooling(Float64, args...)
 function MaxPooling{T,N}(::Type{T}, sizein::NTuple{N,Int}, stride::NTuple{N,Int} = ntuple(i->2,N))
     sizeout = map(s->div(s,2), sizein)
     @show sizein, sizeout
-    input = Node(:input,zeros(T,sizein))
-    output = Node(:output,zeros(T,sizeout))
+    input = InputNode(T,sizein)
+    output = OutputNode(T,sizeout)
     MaxPooling(input, output, stride)
 end
 

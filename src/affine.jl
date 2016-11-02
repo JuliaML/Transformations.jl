@@ -3,16 +3,16 @@
 immutable Affine{T,P<:Params} <: Learnable
     nin::Int
     nout::Int
-    input::Node{:input,T,1}
-    output::Node{:output,T,1}
+    input::SumNode{T,1}
+    output::OutputNode{T,1}
     params::P
 end
 
 function Affine{T}(::Type{T}, nin::Int, nout::Int,
                     θ::AbstractVector = zeros(T, nout*(nin+1)),
                     ∇::AbstractVector = zeros(T, nout*(nin+1)))
-    input = Node(:input, zeros(T, nin))
-    output = Node(:output, zeros(T, nout))
+    input = InputNode(T, nin)
+    output = OutputNode(T, nout)
     params = Params(θ, ∇, ((nout,nin), (nout,)))
     w, b = params.views
     initialize_weights!(w)
@@ -25,18 +25,14 @@ function Base.show(io::IO, t::Affine)
     print(io, "Affine{$(t.nin)-->$(t.nout)}")
 end
 
-params_length(aff::Affine) = length(aff.params.θ)
-params(aff::Affine) = aff.params.θ
-grad(aff::Affine) = aff.params.∇
-
 # compute output = wx + b
-function transform!(aff::Affine)
-    w, b = aff.params.views
-    x = aff.input.val
-    y = aff.output.val
+function transform!(t::Affine)
+    w, b = t.params.views
+    x = t.input.val
+    y = t.output.val
     copy!(y, b)
-    for o=1:aff.nout
-        y[o] += sum(w[o,i] * x[i] for i=1:aff.nin)
+    for o=1:t.nout
+        y[o] += sum(w[o,i] * x[i] for i=1:t.nin)
     end
     y
 end
@@ -46,17 +42,17 @@ end
 #   ∇w = ∂L/∂w
 #   ∇b = ∂L/∂b
 # use the chain rule, assuming that we've already updated ∇out = ∂L/∂y
-function grad!(aff::Affine)
-    w, b = aff.params.views
-    ∇w, ∇b = aff.params.∇_views
-    x = aff.input.val
-    ∇x = aff.input.∇
-    ∇y = aff.output.∇
+function grad!(t::Affine)
+    w, b = t.params.views
+    ∇w, ∇b = t.params.∇_views
+    x = t.input.val
+    ∇x = t.input.∇
+    ∇y = t.output.∇
 
     # ∇x, ∇w
-    for i=1:aff.nin
+    for i=1:t.nin
         ∇xᵢ = zero(eltype(∇x))
-        for o=1:aff.nout
+        for o=1:t.nout
             ∇xᵢ += w[o,i] * ∇y[o]
             ∇w[o,i] = x[i] * ∇y[o]
         end

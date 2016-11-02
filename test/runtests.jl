@@ -3,7 +3,7 @@ using Base.Test
 
 using LearnBase
 import LossFunctions: L2DistLoss
-# using Transformations.TestTransforms
+using Transformations.TestTransforms
 using Distributions
 using StochasticOptimization.Iteration
 import MultivariateStats
@@ -25,184 +25,184 @@ function test_gradient(t::Transformation, ϵ=1e-5)
     verify_gradient(xerr)
 end
 
-# @testset "PCA" begin
-#     nin, nout = 4, 2
-#     n = 50
-#     μ = zeros(nin)
-#     Λ = UpperTriangular(rand(nin,nin))
-#     Σ = Λ'*Λ
-#     mv = MultivariateNormal(μ, Σ)
-#     x = rand(mv, n)
-#
-#     # learn the whitening by passing over the data a few times
-#     # note: since we do this online, it should approach the "true"
-#     # value in the limit
-#     totn = 1000n
-#     w = Whiten(nin, nout, lookback=100n, method=:pca)
-#     for i=1:totn
-#         learn!(w, x[:,mod1(i,n)])
-#     end
-#
-#     # compute the projected output
-#     y = zeros(nout,n)
-#     for (xi,yi) in each_obs(x,y)
-#         yi[:] = transform!(w,xi)
-#     end
-#
-#     # do it using MultivariateStats (the reference)
-#     wref = MultivariateStats.fit(MultivariateStats.PCA, x, maxoutdim=nout)
-#     yref = MultivariateStats.transform(wref, x)
-#
-#     # check that we're close enough to the "true" projection
-#     @test norm(abs(y./yref)-1) < 1
-#
-#     # check that the covariance matrices are close
-#     @test maximum(abs(cov(y') - cov(yref'))) < 1e-2
-#
-#     # check that the means are close
-#     @test maximum(abs(mean(y,2) - mean(yref,2))) < 1e-2
-# end
-#
-# @testset "Whitened PCA" begin
-#     nin, nout = 4, 2
-#     n = 50
-#     μ = zeros(nin)
-#     Λ = UpperTriangular(rand(nin,nin))
-#     Σ = Λ'*Λ
-#     mv = MultivariateNormal(μ, Σ)
-#     x = rand(mv, n)
-#
-#     # learn the whitening by passing over the data a few times
-#     # note: since we do this online, it should approach the "true"
-#     # value in the limit
-#     totn = 10n
-#     w = Whiten(nin, nout, lookback=10n, method=:whitened_pca)
-#     for i=1:totn
-#         learn!(w, x[:,mod1(i,n)])
-#     end
-#
-#     # compute the projected output
-#     y = zeros(nout,n)
-#     for (xi,yi) in each_obs(x,y)
-#         yi[:] = transform!(w,xi)
-#     end
-#
-#     # check that the covariance is close to the identity
-#     # @show cov(y')
-#     @test maximum(abs(cov(y')-I)) < 1e-1
-#
-#     # check that the mean is close to zero
-#     # @show mean(y,2)
-#     @test maximum(abs(mean(y,2))) < 1e-1
-# end
-#
-#
-# @testset "Whitened ZCA" begin
-#     nin, nout = 4, 4
-#     n = 50
-#     μ = zeros(nin)
-#     Λ = UpperTriangular(rand(nin,nin))
-#     Σ = Λ'*Λ
-#     mv = MultivariateNormal(μ, Σ)
-#     x = rand(mv, n)
-#
-#     # learn the whitening by passing over the data a few times
-#     # note: since we do this online, it should approach the "true"
-#     # value in the limit
-#     totn = 100n
-#     w = Whiten(nin, nout, lookback=10n, method=:zca)
-#     for i=1:totn
-#         learn!(w, x[:,mod1(i,n)])
-#     end
-#
-#     # compute the projected output
-#     y = zeros(nout,n)
-#     for (xi,yi) in each_obs(x,y)
-#         yi[:] = transform!(w,xi)
-#     end
-#
-#     # check that the mean is close to zero
-#     # @show mean(y,2)
-#     @test maximum(abs(mean(y,2))) < 1e-1
-# end
-#
-#
-# @testset "Distributions" begin
-#     n = 4
-#     μ = rand(n)
-#     σ = rand(n)
-#     t = MvNormalTransformation(μ, σ)
-#     @test typeof(t.dist.Σ) <: Distributions.PDiagMat
-#     @test t.n == n
-#     @test t.nμ == n
-#     @test t.nU == n
-#     @test input_length(t) == 2n
-#     @test output_length(t) == n
-#     newx = rand(2n)
-#     transform!(t, newx)
-#     grad!(t)
-#     @test t.dist.Σ.diag ≈ newx[n+1:end] .^ 2
-#     @test t.dist.Σ.inv_diag ≈ 1 ./ (newx[n+1:end] .^ 2)
-#
-#     U = rand(n,n)
-#     t = MvNormalTransformation(μ, U*U')
-#     @test typeof(t.dist.μ) <: Vector{Float64}
-#     @test typeof(t.dist.Σ) <: Distributions.PDMat
-#     @test t.n == n
-#     @test t.nμ == n
-#     @test t.nU == div(n*(n+1), 2)
-#     @test input_length(t) == n + div(n*(n+1), 2)
-#     @test output_length(t) == n
-#     newx = rand(input_length(t))
-#     transform!(t, newx)
-#     grad!(t)
-#     @test t.dist.μ == newx[1:n]
-#     cf = t.dist.Σ.chol[:UL]
-#     @test cf[1,2] == newx[n+2]
-#     @test cf[end] == newx[end]
-#
-#     # test_gradient(t)
-# end
-#
-# @testset "Affine" begin
-#     let nin=2, nout=3, input=rand(nin), target=rand(nout)
-#         a = Affine(nin, nout)
-#         loss = L2DistLoss()
-#         w, b = a.params.views
-#         x, y = input_value(a), output_value(a)
-#         ∇w, ∇b = a.params.∇_views
-#         ∇x, ∇y = input_grad(a), output_grad(a)
-#         nparams = nout*(nin+1)
-#
-#         for i=1:2
-#             output = transform!(a, input)
-#
-#             @test y == w * x + b
-#             @test size(x) == (nin,)
-#             @test size(w) == (nout,nin)
-#             @test size(b) == (nout,)
-#             @test size(y) == (nout,)
-#             @test size(∇x) == (nin,)
-#             @test size(∇w) == (nout,nin)
-#             @test size(∇b) == (nout,)
-#             @test size(∇y) == (nout,)
-#             @test size(output) == (nout,)
-#             @test size(params(a)) == (nparams,)
-#             @test size(grad(a)) == (nparams,)
-#
-#             l = value(loss, target, output)
-#             dl = deriv(loss, target, output)
-#             grad!(a, dl)
-#
-#             @test grad(a.output) == dl
-#             @test ∇w ≈ repmat(input', nout, 1) .* repmat(dl, 1, nin)
-#             @test ∇b == dl
-#             @test ∇x ≈ w' * dl
-#         end
-#
-#         test_gradient(a)
-#     end
-# end
+@testset "PCA" begin
+    nin, nout = 4, 2
+    n = 50
+    μ = zeros(nin)
+    Λ = UpperTriangular(rand(nin,nin))
+    Σ = Λ'*Λ
+    mv = MultivariateNormal(μ, Σ)
+    x = rand(mv, n)
+
+    # learn the whitening by passing over the data a few times
+    # note: since we do this online, it should approach the "true"
+    # value in the limit
+    totn = 1000n
+    w = Whiten(nin, nout, lookback=100n, method=:pca)
+    for i=1:totn
+        learn!(w, x[:,mod1(i,n)])
+    end
+
+    # compute the projected output
+    y = zeros(nout,n)
+    for (xi,yi) in each_obs(x,y)
+        yi[:] = transform!(w,xi)
+    end
+
+    # do it using MultivariateStats (the reference)
+    wref = MultivariateStats.fit(MultivariateStats.PCA, x, maxoutdim=nout)
+    yref = MultivariateStats.transform(wref, x)
+
+    # check that we're close enough to the "true" projection
+    @test norm(abs(y./yref)-1) < 1
+
+    # check that the covariance matrices are close
+    @test maximum(abs(cov(y') - cov(yref'))) < 1e-2
+
+    # check that the means are close
+    @test maximum(abs(mean(y,2) - mean(yref,2))) < 1e-2
+end
+
+@testset "Whitened PCA" begin
+    nin, nout = 4, 2
+    n = 50
+    μ = zeros(nin)
+    Λ = UpperTriangular(rand(nin,nin))
+    Σ = Λ'*Λ
+    mv = MultivariateNormal(μ, Σ)
+    x = rand(mv, n)
+
+    # learn the whitening by passing over the data a few times
+    # note: since we do this online, it should approach the "true"
+    # value in the limit
+    totn = 10n
+    w = Whiten(nin, nout, lookback=10n, method=:whitened_pca)
+    for i=1:totn
+        learn!(w, x[:,mod1(i,n)])
+    end
+
+    # compute the projected output
+    y = zeros(nout,n)
+    for (xi,yi) in each_obs(x,y)
+        yi[:] = transform!(w,xi)
+    end
+
+    # check that the covariance is close to the identity
+    # @show cov(y')
+    @test maximum(abs(cov(y')-I)) < 1e-1
+
+    # check that the mean is close to zero
+    # @show mean(y,2)
+    @test maximum(abs(mean(y,2))) < 1e-1
+end
+
+
+@testset "Whitened ZCA" begin
+    nin, nout = 4, 4
+    n = 50
+    μ = zeros(nin)
+    Λ = UpperTriangular(rand(nin,nin))
+    Σ = Λ'*Λ
+    mv = MultivariateNormal(μ, Σ)
+    x = rand(mv, n)
+
+    # learn the whitening by passing over the data a few times
+    # note: since we do this online, it should approach the "true"
+    # value in the limit
+    totn = 100n
+    w = Whiten(nin, nout, lookback=10n, method=:zca)
+    for i=1:totn
+        learn!(w, x[:,mod1(i,n)])
+    end
+
+    # compute the projected output
+    y = zeros(nout,n)
+    for (xi,yi) in each_obs(x,y)
+        yi[:] = transform!(w,xi)
+    end
+
+    # check that the mean is close to zero
+    # @show mean(y,2)
+    @test maximum(abs(mean(y,2))) < 1e-1
+end
+
+
+@testset "Distributions" begin
+    n = 4
+    μ = rand(n)
+    σ = rand(n)
+    t = MvNormalTransformation(μ, σ)
+    @test typeof(t.dist.Σ) <: Distributions.PDiagMat
+    @test t.n == n
+    @test t.nμ == n
+    @test t.nU == n
+    @test input_length(t) == 2n
+    @test output_length(t) == n
+    newx = rand(2n)
+    transform!(t, newx)
+    grad!(t)
+    @test t.dist.Σ.diag ≈ newx[n+1:end] .^ 2
+    @test t.dist.Σ.inv_diag ≈ 1 ./ (newx[n+1:end] .^ 2)
+
+    U = rand(n,n)
+    t = MvNormalTransformation(μ, U*U')
+    @test typeof(t.dist.μ) <: Vector{Float64}
+    @test typeof(t.dist.Σ) <: Distributions.PDMat
+    @test t.n == n
+    @test t.nμ == n
+    @test t.nU == div(n*(n+1), 2)
+    @test input_length(t) == n + div(n*(n+1), 2)
+    @test output_length(t) == n
+    newx = rand(input_length(t))
+    transform!(t, newx)
+    grad!(t)
+    @test t.dist.μ == newx[1:n]
+    cf = t.dist.Σ.chol[:UL]
+    @test cf[1,2] == newx[n+2]
+    @test cf[end] == newx[end]
+
+    # test_gradient(t)
+end
+
+@testset "Affine" begin
+    let nin=2, nout=3, input=rand(nin), target=rand(nout)
+        a = Affine(nin, nout)
+        loss = L2DistLoss()
+        w, b = a.params.views
+        x, y = input_value(a), output_value(a)
+        ∇w, ∇b = a.params.∇_views
+        ∇x, ∇y = input_grad(a), output_grad(a)
+        nparams = nout*(nin+1)
+
+        for i=1:2
+            output = transform!(a, input)
+
+            @test y == w * x + b
+            @test size(x) == (nin,)
+            @test size(w) == (nout,nin)
+            @test size(b) == (nout,)
+            @test size(y) == (nout,)
+            @test size(∇x) == (nin,)
+            @test size(∇w) == (nout,nin)
+            @test size(∇b) == (nout,)
+            @test size(∇y) == (nout,)
+            @test size(output) == (nout,)
+            @test size(params(a)) == (nparams,)
+            @test size(grad(a)) == (nparams,)
+
+            l = value(loss, target, output)
+            dl = deriv(loss, target, output)
+            grad!(a, dl)
+
+            @test grad(a.output) == dl
+            @test ∇w ≈ repmat(input', nout, 1) .* repmat(dl, 1, nin)
+            @test ∇b == dl
+            @test ∇x ≈ w' * dl
+        end
+
+        test_gradient(a)
+    end
+end
 
 @testset "Linear" begin
     let nin=2, nout=3, input=rand(nin), target=rand(nout)

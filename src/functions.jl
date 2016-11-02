@@ -10,14 +10,14 @@ The type parameter DIFFNUM is the number of times it can be differentiated.
 type Differentiable{T,DIFFNUM,P<:Params} <: Minimizable
     f::Function
     df::NTuple{DIFFNUM,Function}
-    input::Node{:input,T,1}
-    output::Node{:output,T,1}
+    input::SumNode{T,1}
+    output::OutputNode{T,1}
     params::P
 end
 Differentiable(args...) = Differentiable(Float64, args...)
 function Differentiable{T}(::Type{T}, f::Function, nθ::Int, nx::Int, df::Function...)
-    input = Node(:input, zeros(T, nx))
-    output = Node(:output, zeros(T, 1))
+    input = InputNode(T, nx)
+    output = OutputNode(T, 1)
     params = Params(T, nθ)
     Differentiable(f, df, input, output, params)
 end

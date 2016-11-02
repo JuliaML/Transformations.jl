@@ -5,18 +5,18 @@ immutable ConvFilter{T,N,P<:Params} <: Learnable
     sizeout::NTuple{N,Int}
     sizefilter::NTuple{N,Int}
     stride::NTuple{N,Int}
-    input::Node{:input,T,N}
-    output::Node{:output,T,N}
+    input::SumNode{T,N}
+    output::OutputNode{T,N}
     params::P
 end
 ConvFilter(args...) = ConvFilter(Float64, args...)
 
 function ConvFilter{T,N}(::Type{T}, sizein::NTuple{N,Int}, sizefilter::NTuple{N,Int}, stride::NTuple{N,Int} = (1,1))
-    input = Node(:input, zeros(T, sizein...))
+    input = InputNode(T, sizein...)
     nr_x,nc_x = sizein
     nr_f,nc_f = sizefilter
     sizeout = (nr_x-nr_f+1, nc_x-nc_f+1)
-    output = Node(:output, zeros(T, sizeout...))
+    output = OutputNode(T, sizeout...)
     nparams = prod(sizefilter) + 1
     params = Params(T, nparams, (sizefilter, (1,)))
     w, b = params.views
@@ -105,8 +105,8 @@ end
 immutable ConvLayer{T,N,P<:Params} <: Learnable
     sizein::NTuple{N,Int}
     sizeout::NTuple{N,Int}
-    input::Node{:input,T,N}
-    output::Node{:output,T,N}
+    input::SumNode{T,N}
+    output::OutputNode{T,N}
     filters::Vector{ConvFilter{T,N,P}}
     params::P
 end
@@ -114,8 +114,8 @@ end
 function ConvLayer{T,N}(::Type{T}, sizein::NTuple{N,Int}, sizefilter::NTuple{N,Int}, numfilters::Int)
     filters = [ConvFilter(T, sizein, sizefilter) for i=1:numfilters]
     sizeout = filters[1].sizeout
-    input = Node(:input, zeros(T,sizein))
-    output = Node(:output, zeros(T,(sizeout..., numfilters)))
+    input = InputNode(T,sizein)
+    output = OutputNode(T,sizeout..., numfilters)
     params = consolidate_params(T, filters)
 
     # TODO: need a concatenating layer of some sort... hmmm

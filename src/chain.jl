@@ -6,39 +6,38 @@
 type Chain{T,P<:Params} <: Learnable
     nin::Int
     nout::Int
-    input::Node{:input,T}
-    output::Node{:output,T}
+    input::SumNode{T,1}
+    output::OutputNode{T,1}
     ts::Vector{Transformation}
     params::P
 end
 
 Chain(ts::Transformation...) = Chain(Float64, ts...)
+Chain{T}(::Type{T}, ts::Transformation...) = Chain(T, convert(Array{Transformation}, collect(ts)))
 
-function Chain{T}(::Type{T}, t1::Transformation, ts::Transformation...)
+function Chain{T,TR<:Transformation}(::Type{T}, ts::AbstractVector{TR})
     # transforms = vcat(t1, ts...)
-    transforms = Array(Transformation, length(ts)+1)
-    transforms[1] = t1
-    for (i,t) in enumerate(ts)
-        # if i > 1
-        link_nodes!(transforms[i].output, t.input)
-        transforms[i+1] = t
-        # end
-    end
+    link_nodes!(ts)
+    # transforms = Array(Transformation, length(ts)+1)
+    # transforms[1] = t1
+    # for (i,t) in enumerate(ts)
+    #     # if i > 1
+    #     link_nodes!(transforms[i].output, t.input)
+    #     transforms[i+1] = t
+    #     # end
+    # end
 
-    params = consolidate_params(T, transforms)
-
-    nin = input_length(transforms[1])
-    nout = output_length(transforms[end])
+    params = consolidate_params(T, ts)
     chain = Chain(
-        nin,
-        nout,
-        Node(:input, zeros(T, nin)),
-        Node(:output, zeros(T, nout)),
-        transforms,
+        input_length(ts[1]),
+        output_length(ts[end]),
+        input_node(ts[1]),
+        output_node(ts[end]),
+        ts,
         params
     )
-    link_nodes!(transforms[1].input, chain.input)
-    link_nodes!(transforms[end].output, chain.output)
+    # link_nodes!(transforms[1].input, chain.input)
+    # link_nodes!(transforms[end].output, chain.output)
     chain
 end
 

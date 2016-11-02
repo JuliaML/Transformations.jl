@@ -11,11 +11,11 @@ immutable Activation{F,T} <: Transformation
 
     # construct a new Activation, and link the nodes if it's the identity
     function Activation(n::Int) #, α::T = zero(T))
-        input = SumNode(T,n)
+        input = InputNode(T,n)
         output = OutputNode(T,n)
-        if F == :identity
-            link_nodes!(output, input)
-        end
+        # if F == :identity
+        #     link_nodes!(output, input)
+        # end
         new(n, input, output)
     end
 end
@@ -34,9 +34,10 @@ output_length(act::Activation) = act.n
 
 const _exp_threshold = 20
 
-# identity: nothing to do, since we linked the input to output
-transform!(act::Activation{:identity}) = act.output.val
-grad!(act::Activation{:identity}) = act.input.∇
+# # identity: nothing to do, since we linked the input to output
+# transform!(act::Activation{:identity}) = act.output.val
+# grad!(act::Activation{:identity}) = act.input.∇
+identity′{T<:Number}(x::T, y::T) = one(T)
 
 # for the following, compute the derivative f′(x), where y = act(x) is assumed precomputed
 # ref: https://en.wikipedia.org/wiki/Activation_function
@@ -89,13 +90,16 @@ for act in activations
 
     @eval begin
         # elementwise map from input to output
-        transform!(act::Activation{Symbol($s)}) = map!($act, act.output.val, forward!(act.input))
+        transform!(act::Activation{Symbol($s)}) = map!($act, act.output.val, act.input.val)
 
         # backprop gradient calc using specialized derivative
         function grad!(act::Activation{Symbol($s)})
-            y∇ = backward!(act.output)
+            ∇x = input_grad(act)
+            ∇y = output_grad(act)
+            x = input_value(act)
+            y = output_value(act)
             for i=1:act.n
-                act.input.∇[i] = $f′(act.input.val[i], act.output.val[i]) * y∇[i]
+                ∇x[i] = $f′(x[i], y[i]) * ∇y[i]
             end
         end
 
