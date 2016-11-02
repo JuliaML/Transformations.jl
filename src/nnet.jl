@@ -92,6 +92,10 @@ function grad!{T}(t::ResidualLayer{T})
     ∇x
 end
 
+function reset_params!{T}(t::ResidualLayer{T}, θ::AbstractVector, ∇::AbstractVector)
+    t.params = reset_params!(t.f, θ, ∇)
+end
+
 # ---------------------------------------------------------------------
 
 "Construct nblocks layers of stacked ResidualLayer blocks, with a final affine mapping to nout"
