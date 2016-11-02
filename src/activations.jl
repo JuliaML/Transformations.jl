@@ -6,13 +6,13 @@
 immutable Activation{F,T} <: Transformation
     n::Int
     # α::T  # scaling parameter for some activations
-    input::Node{:input,T,1}
-    output::Node{:output,T,1}
+    input::SumNode{T,1}
+    output::OutputNode{T,1}
 
     # construct a new Activation, and link the nodes if it's the identity
     function Activation(n::Int) #, α::T = zero(T))
-        input = Node(:input, zeros(T,n))
-        output = Node(:output, zeros(T,n))
+        input = SumNode(T,n)
+        output = OutputNode(T,n)
         if F == :identity
             link_nodes!(output, input)
         end
@@ -89,12 +89,13 @@ for act in activations
 
     @eval begin
         # elementwise map from input to output
-        transform!(act::Activation{Symbol($s)}) = map!($act, act.output.val, act.input.val)
+        transform!(act::Activation{Symbol($s)}) = map!($act, act.output.val, forward!(act.input))
 
         # backprop gradient calc using specialized derivative
         function grad!(act::Activation{Symbol($s)})
+            y∇ = backward!(act.output)
             for i=1:act.n
-                act.input.∇[i] = $f′(act.input.val[i], act.output.val[i]) * act.output.∇[i]
+                act.input.∇[i] = $f′(act.input.val[i], act.output.val[i]) * y∇[i]
             end
         end
 
@@ -117,9 +118,10 @@ end
 # softmax
 
 function transform!{T}(act::Activation{:softmax,T})
+    val = forward!(act.input)
     out = act.output.val
     for i=1:act.n
-        out[i] = exp(act.input.val[i])
+        out[i] = exp(val[i])
     end
     s = one(T) / sum(out)
     for i=1:act.n
@@ -130,7 +132,7 @@ end
 
 # the calc is done in the CrossEntropyLoss... just pass that gradient back
 function grad!{T}(act::Activation{:softmax,T})
-    act.input.∇[:] = act.output.∇
+    copy!(act.input.∇, backward!(act.output))
 end
 
 # ----------------------------------------------------------------------------

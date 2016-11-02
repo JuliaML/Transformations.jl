@@ -103,8 +103,9 @@ grad(t::Learnable) = grad(t.params)
 
 
 # Copy input values into the input node, then transform
-function transform!(t::Transformation, input::AbstractArray)
-    copy!(input_value(t), input)
+function transform!(t::Transformation, x::AbstractArray)
+    # copy!(input_value(t), input)
+    transform!(t.input, x)
     transform!(t)
 end
 
@@ -118,7 +119,8 @@ end
 
 # Copy the gradient into the output node, and propagate it back.
 function grad!(t::Transformation, ∇out::AbstractArray)
-    copy!(output_grad(t), ∇out)
+    # copy!(output_grad(t), ∇out)
+    grad!(t.output, ∇out)
     grad!(t)
 end
 
@@ -163,15 +165,15 @@ end
 include("params.jl")
 include("nodes.jl")
 include("linear.jl")
-include("affine.jl")
-include("layernorm.jl")
+# include("affine.jl")
+# include("layernorm.jl")
 include("activations.jl")
-include("chain.jl")
-include("convolutions.jl")
-include("pooling.jl")
-include("functions.jl")
-include("distributions.jl")
-include("whiten.jl")
+# include("chain.jl")
+# include("convolutions.jl")
+# include("pooling.jl")
+# include("functions.jl")
+# include("distributions.jl")
+# include("whiten.jl")
 
 # ----------------------------------------------------------------
 
@@ -220,7 +222,7 @@ function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Numbe
     end
 
     x = copy(x)
-    x̃ = input_value(t)
+    x̃ = copy(x)
     ∇x = input_grad(t)
     xerr = zeros(length(x))
     for i=1:length(x)
