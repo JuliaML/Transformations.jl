@@ -4,7 +4,7 @@ function nnet_layers(nin::Int, nout::Int;
               nh = Int[],
               inner_activation = :tanh,
               final_activation = :identity,
-              layernorm = true,
+              layernorm = false,
               kw...)
     ns = vcat(nin, nh, nout)
     num_affine = length(ns) - 1
