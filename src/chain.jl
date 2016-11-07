@@ -80,3 +80,5 @@ end
 function reset_params!{T}(chain::Chain{T}, θ::AbstractVector, ∇::AbstractVector)
     chain.params = consolidate_params(T, chain.ts, θ=θ, ∇=∇)
 end
+
+link_nodes!(chain::Chain, i_from::Int, i_to::Int) = link_nodes!(chain.ts[i_from], chain.ts[i_to])
