@@ -4,6 +4,7 @@ using Base.Test
 using LearnBase
 import LossFunctions: L2DistLoss
 using Transformations.TestTransforms
+import Transformations.Testing: check_gradient
 using Distributions
 using StochasticOptimization.Iteration
 import MultivariateStats
@@ -20,7 +21,7 @@ function verify_gradient(err)
 end
 
 function test_gradient(t::Transformation, ϵ=1e-5)
-    perr, xerr = Transformations.check_gradient(t, ϵ=ϵ)
+    perr, xerr = check_gradient(t, ϵ=ϵ)
     verify_gradient(perr)
     verify_gradient(xerr)
 end
@@ -28,24 +29,25 @@ end
 @testset "Concat" begin
     n1, n2 = 2, 3
     n = n1 + n2
-    t = Concat(n)
+    cc = Concat(n)
 
     node1 = Transformations.OutputNode(n1)
-    node1.val[:] = x1 = rand(n1)
-    link_nodes!(node1, input_node(t))
+    node1.val[:] = rand(n1)
+    link_nodes!(node1, input_node(cc))
     node2 = Transformations.OutputNode(n2)
-    node2.val[:] = x2 = rand(n2)
-    link_nodes!(node2, input_node(t))
-    transform!(t.input)
+    node2.val[:] = rand(n2)
+    link_nodes!(node2, input_node(cc))
+    transform!(cc.input)
 
-    @test transform!(t) == vcat(x1,x2)
+    @test transform!(cc) == vcat(node1.val, node2.val)
 
-    ∇y = rand(n)
-    grad!(t, ∇y)
-    @test input_grad(t) == ∇y
+    ∇y = ones(n)
+    grad!(cc, ∇y)
+    @test input_grad(cc) == ∇y
 
-    test_gradient(t)
+    test_gradient(cc)
 end
+
 
 @testset "PCA" begin
     nin, nout = 4, 2
@@ -110,7 +112,7 @@ end
     end
 
     # check that the covariance is close to the identity
-    @show cov(y')
+    # @show cov(y')
     @test maximum(abs(cov(y')-I)) < 1e-1
 
     # check that the mean is close to zero
@@ -187,198 +189,177 @@ end
 end
 
 @testset "Affine" begin
-    let nin=2, nout=3, input=rand(nin), target=rand(nout)
-        a = Affine(nin, nout)
-        loss = L2DistLoss()
-        w, b = a.params.views
-        x, y = input_value(a), output_value(a)
-        ∇w, ∇b = a.params.∇_views
-        ∇x, ∇y = input_grad(a), output_grad(a)
-        nparams = nout*(nin+1)
+    nin, nout = 2, 3
+    input = rand(nin)
+    target = rand(nout)
+    a = Affine(nin, nout)
+    loss = L2DistLoss()
+    w, b = a.params.views
+    x, y = input_value(a), output_value(a)
+    ∇w, ∇b = a.params.∇_views
+    ∇x, ∇y = input_grad(a), output_grad(a)
+    nparams = nout*(nin+1)
 
-        for i=1:2
-            output = transform!(a, input)
+    for i=1:2
+        output = transform!(a, input)
 
-            @test y == w * x + b
-            @test size(x) == (nin,)
-            @test size(w) == (nout,nin)
-            @test size(b) == (nout,)
-            @test size(y) == (nout,)
-            @test size(∇x) == (nin,)
-            @test size(∇w) == (nout,nin)
-            @test size(∇b) == (nout,)
-            @test size(∇y) == (nout,)
-            @test size(output) == (nout,)
-            @test size(params(a)) == (nparams,)
-            @test size(grad(a)) == (nparams,)
+        @test y == w * x + b
+        @test size(x) == (nin,)
+        @test size(w) == (nout,nin)
+        @test size(b) == (nout,)
+        @test size(y) == (nout,)
+        @test size(∇x) == (nin,)
+        @test size(∇w) == (nout,nin)
+        @test size(∇b) == (nout,)
+        @test size(∇y) == (nout,)
+        @test size(output) == (nout,)
+        @test size(params(a)) == (nparams,)
+        @test size(grad(a)) == (nparams,)
 
-            l = value(loss, target, output)
-            dl = deriv(loss, target, output)
-            grad!(a, dl)
+        l = value(loss, target, output)
+        dl = deriv(loss, target, output)
+        grad!(a, dl)
 
-            @test grad(a.output) == dl
-            @test ∇w ≈ repmat(input', nout, 1) .* repmat(dl, 1, nin)
-            @test ∇b == dl
-            @test ∇x ≈ w' * dl
-        end
-
-        test_gradient(a)
+        @test grad(a.output) == dl
+        @test ∇w ≈ repmat(input', nout, 1) .* repmat(dl, 1, nin)
+        @test ∇b == dl
+        @test ∇x ≈ w' * dl
     end
+
+    test_gradient(a)
 end
 
 @testset "Linear" begin
-    let nin=2, nout=3, input=rand(nin), target=rand(nout)
-        t = Linear(nin, nout)
-        loss = L2DistLoss()
-        w = t.params.views[1]
-        x, y = input_value(t), output_value(t)
-        ∇w = t.params.∇_views[1]
-        ∇x, ∇y = input_grad(t), output_grad(t)
-        nparams = nout*nin
+    nin, nout = 2, 3
+    input = rand(nin)
+    target = rand(nout)
+    t = Linear(nin, nout)
+    loss = L2DistLoss()
+    w = t.params.views[1]
+    x, y = input_value(t), output_value(t)
+    ∇w = t.params.∇_views[1]
+    ∇x, ∇y = input_grad(t), output_grad(t)
+    nparams = nout*nin
 
-        for i=1:2
-            output = transform!(t, input)
+    for i=1:2
+        output = transform!(t, input)
 
-            wx = w * x
-            @test y ≈ wx
-            @test size(x) == (nin,)
-            @test size(w) == (nout,nin)
-            @test size(y) == (nout,)
-            @test size(∇x) == (nin,)
-            @test size(∇w) == (nout,nin)
-            @test size(∇y) == (nout,)
-            @test size(output) == (nout,)
-            @test size(params(t)) == (nparams,)
-            @test size(grad(t)) == (nparams,)
+        wx = w * x
+        @test y ≈ wx
+        @test size(x) == (nin,)
+        @test size(w) == (nout,nin)
+        @test size(y) == (nout,)
+        @test size(∇x) == (nin,)
+        @test size(∇w) == (nout,nin)
+        @test size(∇y) == (nout,)
+        @test size(output) == (nout,)
+        @test size(params(t)) == (nparams,)
+        @test size(grad(t)) == (nparams,)
 
-            l = value(loss, target, output)
-            dl = deriv(loss, target, output)
-            grad!(t, dl)
+        l = value(loss, target, output)
+        dl = deriv(loss, target, output)
+        grad!(t, dl)
 
-            @test grad(t.output) == dl
-            @test ∇w ≈ repmat(input', nout, 1) .* repmat(dl, 1, nin)
-            @test ∇x ≈ w' * dl
-        end
-
-        test_gradient(t, 1e-5)
+        @test grad(t.output) == dl
+        @test ∇w ≈ repmat(input', nout, 1) .* repmat(dl, 1, nin)
+        @test ∇x ≈ w' * dl
     end
+
+    test_gradient(t, 1e-5)
 end
 
 @testset "LayerNorm" begin
-    let n=3, input=rand(n)
-        t = LayerNorm(n, α=1.0)
-        g, b = t.params.views
-        a, y = input_value(t), output_value(t)
-        ∇g, ∇b = t.params.∇_views
-        ∇a, ∇y = input_grad(t), output_grad(t)
-        nparams = 2n
+    n = 3
+    input = rand(n)
+    t = LayerNorm(n, α=1.0)
+    g, b = t.params.views
+    a, y = input_value(t), output_value(t)
+    ∇g, ∇b = t.params.∇_views
+    ∇a, ∇y = input_grad(t), output_grad(t)
+    nparams = 2n
 
-        for i=1:2
-            output = transform!(t, input)
+    for i=1:2
+        output = transform!(t, input)
 
-            @test y ≈ g .* (a .- mean(a)) ./ std(a) .+ b
-            @test size(a) == (n,)
-            @test size(g) == (n,)
-            @test size(b) == (n,)
-            @test size(y) == (n,)
-            @test size(∇a) == (n,)
-            @test size(∇g) == (n,)
-            @test size(∇b) == (n,)
-            @test size(∇y) == (n,)
-            @test size(output) == (n,)
-            @test size(params(t)) == (nparams,)
-            @test size(grad(t)) == (nparams,)
-
-            # l = value(loss, target, output)
-            # dl = deriv(loss, target, output)
-            # grad!(t, dl)
-            #
-            # @test grad(t.output) == dl
-            # @test ∇w ≈ repmat(input', n, 1) .* repmat(dl .* g, 1, n)
-            # @test ∇g ≈ dl .* wx
-            # @test ∇b == dl
-            # @test ∇a ≈ w' * (dl .* g)
-        end
-
-        # first test with g=ones, b=zeros, then test with random number
-        test_gradient(t, 1e-5)
-        g[:] = rand(n)
-        b[:] = rand(n)
-        test_gradient(t, 1e-5)
+        @test y ≈ g .* (a .- mean(a)) ./ std(a) .+ b
+        @test size(a) == (n,)
+        @test size(g) == (n,)
+        @test size(b) == (n,)
+        @test size(y) == (n,)
+        @test size(∇a) == (n,)
+        @test size(∇g) == (n,)
+        @test size(∇b) == (n,)
+        @test size(∇y) == (n,)
+        @test size(output) == (n,)
+        @test size(params(t)) == (nparams,)
+        @test size(grad(t)) == (nparams,)
     end
-end
 
-# using Plots
-# unicodeplots(size=(400,100))
+    # first test with g=ones, b=zeros, then test with random number
+    test_gradient(t, 1e-5)
+    g[:] = rand(n)
+    b[:] = rand(n)
+    test_gradient(t, 1e-5)
+end
 
 @testset "Activations" begin
-    let n=2, input=rand(n)
-        for s in Transformations.activations
-            f = Activation{s,Float64}(n)
-            output = transform!(f, input)
-            @test output == map(@eval($s), input)
+    n = 2
+    input = rand(n)
+    for s in Transformations.activations
+        f = Activation{s,Float64}(n)
+        output = transform!(f, input)
+        @test output == map(@eval($s), input)
 
-            grad!(f, ones(2))
-            @test f.input.∇ == map(@eval($(Symbol(s,"′"))), input)
+        grad!(f, ones(2))
+        @test f.input.∇ == map(@eval($(Symbol(s,"′"))), input)
 
-            # println()
-            # plot(f, show=true)
-            # @show s f input output f.output.∇ f.input.∇
-            test_gradient(f)
-        end
+        test_gradient(f)
     end
 end
 
+
 @testset "Chain" begin
-    let n1=4, n2=3, n3=2, input=rand(4)
-        # println()
+    n1, n2, n3 = 4,5,2
+    input = rand(n1)
 
-        T = Float64
-        chain = Chain(T,
-            Affine(T, n1, n2),
-            Activation{:relu,T}(n2),
-            Affine(T, n2, n3),
-            Activation{:logistic,T}(n3)
-        )
-        # @show chain
+    T = Float64
+    chain = Chain(T,
+        Affine(T, n1, n2),
+        Activation{:relu,T}(n2),
+        Affine(T, n2, n3),
+        Activation{:logistic,T}(n3)
+    )
 
-        @test length(chain.ts) == 4
-        @test chain.ts[1].input.val === chain.input.val
-        @test chain.ts[end].output.val === chain.output.val
+    @test length(chain.ts) == 4
+    @test chain.ts[1].input.val === chain.input.val
+    @test chain.ts[end].output.val === chain.output.val
 
-        input_copy = copy(input)
-        x = copy(input)
-        # y = copy(transform!(chain, input))
-        for t in chain.ts
-            x = copy(transform!(t, x))
-            @test x ≈ output_value(t)
-        end
-        @test input == input_copy
-        y = copy(transform!(chain, input))
-        @test y ≈ output_value(chain.ts[end])
-        @test y ≈ x
-
-        # first compute the chain of transformations manually,
-        manual_output = input
-        for t in chain.ts
-            manual_output = transform!(t, manual_output)
-            # @show t manual_output
-        end
-
-        # now do it using the chain, and make sure it matches
-        output = transform!(chain, input)
-        # @show output
-        @test manual_output == output
-
-        test_gradient(chain)
+    x = input
+    for t in chain.ts
+        x = transform!(t, x)
+        @test x ≈ output_value(t)
     end
+    y = transform!(chain, input)
+    @test y ≈ output_value(chain.ts[end])
+    @test y ≈ x
+
+    # first compute the chain of transformations manually,
+    manual_output = input
+    for t in chain.ts
+        manual_output = transform!(t, manual_output)
+    end
+
+    # now do it using the chain, and make sure it matches
+    output = transform!(chain, input)
+    @test manual_output == output
+
+    test_gradient(chain)
 end
 
 @testset "ResidualLayer" begin
     n = 3
     f = nnet(3, 3, [4], layernorm=false)
     t = ResidualLayer(n, f)
-    # @show t
     @test f === t.f
 
     x = rand(n)
@@ -417,11 +398,6 @@ end
         x̂ = transform!(t.ts[i])
     end
     @test y ≈ x̂
-    # @test y ≈ transform!(t.ts[3],
-    #             copy(transform!(t.ts[2],
-    #                 copy(transform!(t.ts[1], x)))
-    #             )
-    #           )
 
     ∇y = rand(nout)
     grad!(t, ∇y)

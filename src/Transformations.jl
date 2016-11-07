@@ -183,7 +183,14 @@ include("whiten.jl")
 
 # ----------------------------------------------------------------
 
-function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Number = 1e-5)
+module Testing
+
+using LearnBase
+using ..Transformations
+
+function check_gradient(t::Transformations.Transformation,
+                        x = randn(input_length(t));
+                        ϵ::Number = 1e-5)
     # first get: y = f(x)
     y = transform!(t, x)
 
@@ -249,6 +256,8 @@ function check_gradient(t::Transformation, x = randn(input_length(t)); ϵ::Numbe
     end
     perr, xerr
 end
+
+end # Testing
 
 # ----------------------------------------------------------------
 
