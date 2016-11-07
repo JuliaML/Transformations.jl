@@ -49,6 +49,28 @@ end
 end
 
 
+@testset "Gate" begin
+    n = 3
+    g = Gate(n)
+
+    node1 = Transformations.OutputNode(n)
+    node1.val[:] = rand(n)
+    link_nodes!(node1, input_node(g))
+    node2 = Transformations.OutputNode(n)
+    node2.val[:] = rand(n)
+    link_nodes!(node2, input_node(g))
+    transform!(g.input)
+
+    @test transform!(g) ≈ node1.val .* node2.val
+
+    ∇y = ones(n)
+    grad!(g, ∇y)
+    @test input_grad(g) == ∇y
+
+    # test_gradient(g)
+end
+
+
 @testset "PCA" begin
     nin, nout = 4, 2
     n = 50
@@ -88,7 +110,7 @@ end
 end
 
 @testset "Whitened PCA" begin
-    nin, nout = 4, 3
+    nin, nout = 4, 2
     n = 50
     μ = zeros(nin)
     Λ = UpperTriangular(rand(nin,nin))
@@ -99,7 +121,7 @@ end
     # learn the whitening by passing over the data a few times
     # note: since we do this online, it should approach the "true"
     # value in the limit
-    totn = 20n
+    totn = 50n
     w = Whiten(nin, nout, lookback=totn, method=:whitened_pca)
     for i=1:totn
         learn!(w, x[:,mod1(i,n)])
@@ -374,7 +396,7 @@ end
     grad!(t, ∇y)
     @test output_grad(f) == ∇y
 
-    test_gradient(t)
+    test_gradient(t, 1e-8)
 end
 
 
