@@ -11,7 +11,7 @@ function nnet_layers(nin::Int, nout::Int;
     layers = Transformation[]
     for i=1:num_affine
         # push!(layers, (layernorm ? LayerNorm : Affine)(ns[i], ns[i+1]))
-        if layernorm
+        if layernorm && !(i==num_affine && final_activation == :identity)
             push!(layers, Linear(ns[i], ns[i+1]))
             push!(layers, LayerNorm(ns[i+1]; kw...))
         else
