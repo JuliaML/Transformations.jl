@@ -9,7 +9,7 @@ grad(node::Node) = node.∇
 # ----------------------------------------------------------
 
 "The output from a Transformation.  Can project to zero to many InputNodes"
-immutable OutputNode{T,N} <: Node{T,N}
+type OutputNode{T,N} <: Node{T,N}
     tonodes::Vector{Node}
     val::Array{T,N}
     ∇::Array{T,N}
@@ -20,18 +20,19 @@ function OutputNode{T}(::Type{T}, dims::Int...)
 end
 
 # backprop gradients from linked nodes
-function grad!{T}(node::OutputNode{T})
-    ∇ = grad(node)
+function grad!{T}(fromnode::OutputNode{T})
+    ∇ = grad(fromnode)
     fill!(∇, zero(T))
-    for tonode in node.tonodes
-        ∇ .+= tonode.∇
+    for tonode in fromnode.tonodes
+        # ∇ .+= tonode.∇
+        backward!(fromnode, tonode)
     end
     ∇
 end
 
 # add out∇ to the backprop gradient
-function grad!{T,N}(node::OutputNode{T,N}, out∇::AbstractArray{T,N})
-    ∇ = grad!(node)
+function grad!{T,N}(fromnode::OutputNode{T,N}, out∇::AbstractArray{T,N})
+    ∇ = grad!(fromnode)
     ∇ .+= out∇
     ∇
 end
@@ -47,6 +48,7 @@ immutable InputNode{OP,T,N} <: Node{T,N}
     fromnodes::Vector{Node}
     val::Array{T,N}
     ∇::Array{T,N}
+    offset::Dict{OutputNode{T,N},Int}  # used for starting index offset of concatenation
 end
 InputNode(dims::Int...) = InputNode(:+, Float64, dims...)
 InputNode{T}(::Type{T}, dims::Int...) = InputNode(:+, T, dims...)
@@ -54,38 +56,74 @@ InputNode(op::Symbol, dims::Int...) = InputNode(op, Float64, dims...)
 
 # the real constructor
 function InputNode{T}(op::Symbol, ::Type{T}, dims::Int...)
-    InputNode{op,T,length(dims)}(Node[], zeros(T, dims...), zeros(T, dims...))
+    InputNode{op,T,length(dims)}(Node[], zeros(T, dims...), zeros(T, dims...), Dict{OutputNode{T,length(dims)},Int}())
 end
 
 # forward pass, aggregate output values from OutputNodes
-function transform!(node::InputNode)
-    reset_val!(node)
-    for fromnode in node.fromnodes
-        forward!(fromnode, node)
+function transform!(tonode::InputNode)
+    reset_val!(tonode)
+    for fromnode in tonode.fromnodes
+        forward!(fromnode, tonode)
     end
-    node.val
+    tonode.val
 end
 
 # aggregate inval along with the normal forward pass
-function transform!{OP,T,N}(node::InputNode{OP,T,N}, inval::AbstractArray{T,N})
-    transform!(node)
-    forward!(inval, node)
-    node.val
+function transform!{OP,T,N}(tonode::InputNode{OP,T,N}, inval::AbstractArray{T,N})
+    transform!(tonode)
+    forward!(inval, tonode)
+    tonode.val
 end
 
-forward!(fromnode::OutputNode, node::InputNode) = forward!(fromnode.val, node)
+function forward!(fromnode::OutputNode, tonode::InputNode)
+    forward!(fromnode.val, tonode)
+end
+
+function link_nodes!(fromnode::OutputNode, tonode::InputNode)
+    push!(fromnode.tonodes, tonode)
+    push!(tonode.fromnodes, fromnode)
+    nodes_linked(fromnode, tonode)
+    return
+end
+
+# a callback when nodes are linked
+nodes_linked(fromnode::OutputNode, tonode::InputNode) = return
 
 # ----------------------------------------------------------
 
+# elementwise sum
 typealias SumNode{T,N} InputNode{:+,T,N}
-reset_val!{T}(node::SumNode{T}) = fill!(node.val, zero(T))
-forward!{T,N}(val::AbstractArray{T,N}, node::SumNode{T,N}) = (node.val .+= val)
+reset_val!{T}(tonode::SumNode{T}) = fill!(tonode.val, zero(T))
+forward!{T,N}(val::AbstractArray{T,N}, tonode::SumNode{T,N}) = (tonode.val .+= val)
+backward!{T}(fromnode::OutputNode{T}, tonode::SumNode{T}) = (fromnode.∇ .+= tonode.∇)
 
 # ----------------------------------------------------------
 
+# elementwise product
 typealias ProdNode{T,N} InputNode{:*,T,N}
-reset_val!{T}(node::ProdNode{T}) = fill!(node.val, one(T))
-forward!{T,N}(val::AbstractArray{T,N}, node::ProdNode{T,N}) = (node.val .*= val)
+reset_val!{T}(tonode::ProdNode{T}) = fill!(tonode.val, one(T))
+forward!{T,N}(val::AbstractArray{T,N}, tonode::ProdNode{T,N}) = (tonode.val .*= val)
+function backward!{T}(fromnode::OutputNode{T}, tonode::ProdNode{T})
+    fromnode.∇ .+= tonode.∇ .* tonode.val ./ fromnode.val
+end
+
+# ----------------------------------------------------------
+
+# concatenation
+typealias CatNode{T,N} InputNode{:cat,T,N}
+function nodes_linked{T,N}(fromnode::OutputNode{T,N}, tonode::CatNode{T,N})
+    tonode.offset[fromnode] = isempty(tonode.offset) ? 0 : sum(node->length(node.val), keys(tonode.offset))
+end
+reset_val!(tonode::CatNode) = return
+forward!{T,N}(val::AbstractArray{T,N}, tonode::CatNode{T,N}) = (tonode.val .+= val)
+function forward!{T,N}(fromnode::OutputNode{T,N}, tonode::CatNode{T,N})
+    offset = tonode.offset[fromnode]
+    tonode.val[offset+1:offset+length(fromnode.val)] = fromnode.val
+end
+function backward!{T,N}(fromnode::OutputNode{T,N}, tonode::CatNode{T,N})
+    offset = tonode.offset[fromnode]
+    fromnode.∇ .+= view(tonode.∇, offset+1:offset+length(fromnode.∇))
+end
 
 # ----------------------------------------------------------
 
@@ -122,11 +160,6 @@ forward!{T,N}(val::AbstractArray{T,N}, node::ProdNode{T,N}) = (node.val .*= val)
 #     innode.∇ = outnode.∇
 # end
 
-function link_nodes!(fromnode::OutputNode, tonode::InputNode)
-    push!(fromnode.tonodes, tonode)
-    push!(tonode.fromnodes, fromnode)
-    return
-end
 
 function link_nodes!(ts::Transformation...)
     for i=2:length(ts)

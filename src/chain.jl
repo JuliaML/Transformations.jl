@@ -71,7 +71,7 @@ function grad!(chain::Chain)
         i > 1 && grad!(output_node(t))
         grad!(t)
     end
-    output_value(chain)
+    input_grad(chain)
 end
 
 # transform!(chain::Chain) = (foreach(transform!, chain.ts); chain.output.val)

@@ -25,6 +25,28 @@ function test_gradient(t::Transformation, ϵ=1e-5)
     verify_gradient(xerr)
 end
 
+@testset "Concat" begin
+    n1, n2 = 2, 3
+    n = n1 + n2
+    t = Concat(n)
+
+    node1 = Transformations.OutputNode(n1)
+    node1.val[:] = x1 = rand(n1)
+    link_nodes!(node1, input_node(t))
+    node2 = Transformations.OutputNode(n2)
+    node2.val[:] = x2 = rand(n2)
+    link_nodes!(node2, input_node(t))
+    transform!(t.input)
+
+    @test transform!(t) == vcat(x1,x2)
+
+    ∇y = rand(n)
+    grad!(t, ∇y)
+    @test input_grad(t) == ∇y
+
+    test_gradient(t)
+end
+
 @testset "PCA" begin
     nin, nout = 4, 2
     n = 50
@@ -64,7 +86,7 @@ end
 end
 
 @testset "Whitened PCA" begin
-    nin, nout = 4, 2
+    nin, nout = 4, 3
     n = 50
     μ = zeros(nin)
     Λ = UpperTriangular(rand(nin,nin))
@@ -75,8 +97,8 @@ end
     # learn the whitening by passing over the data a few times
     # note: since we do this online, it should approach the "true"
     # value in the limit
-    totn = 10n
-    w = Whiten(nin, nout, lookback=10n, method=:whitened_pca)
+    totn = 20n
+    w = Whiten(nin, nout, lookback=totn, method=:whitened_pca)
     for i=1:totn
         learn!(w, x[:,mod1(i,n)])
     end
@@ -88,7 +110,7 @@ end
     end
 
     # check that the covariance is close to the identity
-    # @show cov(y')
+    @show cov(y')
     @test maximum(abs(cov(y')-I)) < 1e-1
 
     # check that the mean is close to zero
@@ -324,11 +346,16 @@ end
         @test chain.ts[1].input.val === chain.input.val
         @test chain.ts[end].output.val === chain.output.val
 
-        y = copy(transform!(chain, input))
+        input_copy = copy(input)
         x = copy(input)
+        # y = copy(transform!(chain, input))
         for t in chain.ts
             x = copy(transform!(t, x))
+            @test x ≈ output_value(t)
         end
+        @test input == input_copy
+        y = copy(transform!(chain, input))
+        @test y ≈ output_value(chain.ts[end])
         @test y ≈ x
 
         # first compute the chain of transformations manually,

@@ -37,6 +37,8 @@ export
     Affine,
     LayerNorm,
     Activation,
+    Concat,
+    Gate,
     PreprocessStep,
     NoPreprocessing,
     Whiten,
@@ -168,6 +170,7 @@ include("params.jl")
 include("nodes.jl")
 include("linear.jl")
 include("affine.jl")
+include("misc.jl")
 include("layernorm.jl")
 include("activations.jl")
 include("chain.jl")

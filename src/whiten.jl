@@ -110,7 +110,7 @@ function learn!{T}(o::Whiten{T}, x::AbstractVector = input_value(o))
         # if eᵢ ≈ zero(T)
         #     warn("Got small e[$i] ($(eᵢ)) while computing iteration $(o.wgt.nobs) for:\n  $o")
         # end
-		Vᵢ = Uᵢ / max(eᵢ, T(1e-3))
+		Vᵢ = Uᵢ / max(eᵢ, T(1e-8))
 
 		# store these updates
 		o.U[i,:] = Uᵢ
@@ -140,7 +140,7 @@ end
 
 function whitened_pca{T}(o::Whiten{T})
     y = normal_pca(o)
-    y[:] = y ./ sqrt.(o.e .+ T(1e-1))
+    y[:] = y ./ sqrt.(o.e .+ T(1e-8))
     y
 end
 
