@@ -122,7 +122,8 @@ end
 # softmax
 
 function transform!{T}(act::Activation{:softmax,T})
-    val = forward!(act.input)
+    # val = forward!(act.input)
+    val = act.input.val
     out = act.output.val
     for i=1:act.n
         out[i] = exp(val[i])
@@ -136,7 +137,8 @@ end
 
 # the calc is done in the CrossEntropyLoss... just pass that gradient back
 function grad!{T}(act::Activation{:softmax,T})
-    copy!(act.input.∇, backward!(act.output))
+    # copy!(act.input.∇, backward!(act.output))
+    copy!(act.input.∇, act.output.∇)
 end
 
 # ----------------------------------------------------------------------------
