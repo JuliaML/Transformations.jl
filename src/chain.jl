@@ -10,20 +10,45 @@ type Chain{T,P<:Params} <: Learnable
     output::OutputNode{T,1}
     ts::Vector{Transformation}
     params::P
+    grad_calc::Symbol
+    Bs::Vector{Nullable{Matrix{T}}}  # these are the fixed/random matrices Bᵢ for the DFA method
 end
 
-Chain(ts::Transformation...) = Chain(Float64, ts...)
-Chain{T}(::Type{T}, ts::Transformation...) = Chain(T, convert(Array{Transformation}, collect(ts)))
+Chain(ts::Transformation...; kw...) = Chain(Float64, ts...; kw...)
+Chain{T}(::Type{T}, ts::Transformation...; kw...) = Chain(T, convert(Array{Transformation}, collect(ts)); kw...)
 
-function Chain{T,TR<:Transformation}(::Type{T}, ts::AbstractVector{TR})
+function Chain{T,TR<:Transformation}(::Type{T}, ts::AbstractVector{TR};
+                                     grad_calc::Symbol = :backprop)
     link_nodes!(ts)
+
+    # initialize DFA method
+    Bs = Nullable{Matrix{T}}[]
+    if grad_calc == :dfa
+        for (i,t) in enumerate(ts)
+            nΘ = params_length(t)
+            Bi = if nΘ == 0 || i == length(ts)
+                # don't do anything for non-learnable transformations,
+                # or the final transformation (we'll just backprop that one)
+                Nullable{Matrix{T}}()
+            else
+                ny = output_length(t)
+                B = zeros(T, output_length(t), output_length(ts[end]))
+                initialize_weights!(B)
+                Nullable{Matrix{T}}(B)
+            end
+            push!(Bs, Bi)
+        end
+    end
+
     Chain(
         input_length(ts[1]),
         output_length(ts[end]),
         input_node(ts[1]),
         output_node(ts[end]),
         ts,
-        consolidate_params(T, ts)
+        consolidate_params(T, ts),
+        grad_calc,
+        Bs
     )
 end
 
@@ -67,11 +92,46 @@ function transform!(chain::Chain)
 end
 
 function grad!(chain::Chain)
-    for (i,t) in enumerate(reverse(chain.ts))
-        i > 1 && grad!(output_node(t))
-        grad!(t)
+    if chain.grad_calc == :backprop
+        for (i,t) in enumerate(reverse(chain.ts))
+            i > 1 && grad!(output_node(t))
+            grad!(t)
+        end
+        input_grad(chain)
+    elseif chain.grad_calc == :dfa
+        #= going through the list:
+            - skip non-learnables
+            - final transform uses normal backprop
+            - other learnables use DFA: ∇yᵢ = Bᵢ∇yₘ
+        =#
+        ∇y = output_grad(chain)
+        n = length(chain.ts)
+        # @show n ∇y
+        for (j,t) in enumerate(reverse(chain.ts))
+            i = n - j + 1
+            # @show i, t
+            if isnull(chain.Bs[i])
+                # non-learnables get backprop
+                i < n && grad!(output_node(t))
+                # @show "null" grad!(t)
+                grad!(t)
+            else
+                if i == n
+                    # final node gets backprop
+                    grad!(t)
+                else
+                    # other learnables get DFA
+                    Bᵢ = get(chain.Bs[i])
+                    # @show Bᵢ
+                    grad!(t, Bᵢ * ∇y)
+                end
+            end
+            # @show output_grad(t) grad(t) input_grad(t)
+        end
+        input_grad(chain)
+    else
+        error("Unsupported grad_calc: ", chain.grad_calc)
     end
-    input_grad(chain)
 end
 
 # transform!(chain::Chain) = (foreach(transform!, chain.ts); chain.output.val)

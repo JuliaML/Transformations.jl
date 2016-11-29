@@ -28,8 +28,14 @@ function nnet_layers(nin::Int, nout::Int;
 end
 
 function nnet(nin::Int, nout::Int, nh::AbstractVector{Int},
-              iact = :tanh, fact = :identity; kw...)
-    Chain(Float64, nnet_layers(nin, nout; nh=nh, inner_activation=iact, final_activation=fact, kw...))
+              iact = :tanh, fact = :identity; grad_calc = :backprop, kw...)
+    Chain(Float64, nnet_layers(
+        nin, nout;
+        nh=nh,
+        inner_activation=iact,
+        final_activation=fact,
+        kw...
+    ), grad_calc=grad_calc)
 end
 
 # ---------------------------------------------------------------------

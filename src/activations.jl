@@ -68,6 +68,9 @@ sinusoid′{T<:Number}(x::T, y::T) = cos(x)
 gaussian{T<:Number}(x::T) = exp(-(x^2))
 gaussian′{T<:Number}(x::T, y::T) = -2x*y
 
+threshold{T<:Number}(x::T) = x > zero(T) ? one(T) : zero(T)
+threshold′{T<:Number}(x::T, y::T) = zero(T)
+
 
 
 # ----------------------------------------------------------------------------
@@ -82,6 +85,7 @@ const activations = [
     :softplus,
     :sinusoid,
     :gaussian,
+    :threshold,
 ]
 
 for act in activations
