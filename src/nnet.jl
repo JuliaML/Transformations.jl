@@ -5,18 +5,24 @@ function nnet_layers(nin::Int, nout::Int;
               inner_activation = :tanh,
               final_activation = :identity,
               layernorm = false,
+              inputnorm = false,
               kw...)
     ns = vcat(nin, nh, nout)
     num_affine = length(ns) - 1
     layers = Transformation[]
     for i=1:num_affine
         # push!(layers, (layernorm ? LayerNorm : Affine)(ns[i], ns[i+1]))
+        if inputnorm
+            push!(layers, InputNorm(ns[i]; kw...))
+        end
+
         if layernorm && !(i==num_affine && final_activation == :identity)
             push!(layers, Linear(ns[i], ns[i+1]))
             push!(layers, LayerNorm(ns[i+1]; kw...))
         else
             push!(layers, Affine(ns[i], ns[i+1]))
         end
+
         if inner_activation != :identity && i < num_affine
             push!(layers, Activation(inner_activation, ns[i+1]))
         end

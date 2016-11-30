@@ -32,8 +32,10 @@ function Chain{T,TR<:Transformation}(::Type{T}, ts::AbstractVector{TR};
                 Nullable{Matrix{T}}()
             else
                 ny = output_length(t)
+                # B = zeros(T, input_length(t), output_length(ts[end]))
                 B = zeros(T, output_length(t), output_length(ts[end]))
                 initialize_weights!(B)
+                fill!(params(t), zero(T))  # reset params to 0... should we keep this?
                 Nullable{Matrix{T}}(B)
             end
             push!(Bs, Bi)
@@ -104,9 +106,9 @@ function grad!(chain::Chain)
             - final transform uses normal backprop
             - other learnables use DFA: ∇yᵢ = Bᵢ∇yₘ
         =#
-        ∇y = output_grad(chain)
+        ∇out = output_grad(chain)
         n = length(chain.ts)
-        # @show n ∇y
+        # @show n ∇out
         for (j,t) in enumerate(reverse(chain.ts))
             i = n - j + 1
             # @show i, t
@@ -123,7 +125,14 @@ function grad!(chain::Chain)
                     # other learnables get DFA
                     Bᵢ = get(chain.Bs[i])
                     # @show Bᵢ
-                    grad!(t, Bᵢ * ∇y)
+                    grad!(t, Bᵢ * ∇out)
+                    # ∇y = if isa(t, Affine) || isa(t, Linear)
+                    #     w = t.params.views[1]
+                    #     w * (Bᵢ * ∇out)
+                    # else
+                    #     error("Only Affine and Linear Learnables are supported with DFA")
+                    # end
+                    # grad!(t, ∇y)
                 end
             end
             # @show output_grad(t) grad(t) input_grad(t)
