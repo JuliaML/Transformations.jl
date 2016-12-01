@@ -71,6 +71,8 @@ gaussian′{T<:Number}(x::T, y::T) = -2x*y
 threshold{T<:Number}(x::T) = x > zero(T) ? one(T) : zero(T)
 threshold′{T<:Number}(x::T, y::T) = zero(T)
 
+sign′{T<:Number}(x::T, y::T) = zero(T)
+
 
 
 # ----------------------------------------------------------------------------
@@ -86,6 +88,7 @@ const activations = [
     :sinusoid,
     :gaussian,
     :threshold,
+    :sign,
 ]
 
 for act in activations
