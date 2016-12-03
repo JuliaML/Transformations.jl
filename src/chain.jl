@@ -28,7 +28,7 @@ function Chain{T,TR<:Transformation}(::Type{T}, ts::AbstractVector{TR};
     if grad_calc == :dfa
         for (i,t) in enumerate(ts)
             nΘ = params_length(t)
-            Bi = if nΘ == 0 || i == length(ts)
+            Bi = if nΘ == 0 || i >= length(ts)-1
                 # don't do anything for non-learnable transformations,
                 # or the final transformation (we'll just backprop that one)
                 Nullable{Matrix{T}}()
