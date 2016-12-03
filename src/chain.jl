@@ -3,13 +3,14 @@
 # One could represent an ANN like:
 #   affine(n1,n2) --> relu(n2) --> affine(n2,n3) --> logistic(n3)
 # The output of a chain could be fed into a loss model for backprop
-type Chain{T,P<:Params} <: Learnable
+type Chain{T,P<:Params,PREP<:PreprocessStep} <: Learnable
     nin::Int
     nout::Int
     input::SumNode{T,1}
     output::OutputNode{T,1}
     ts::Vector{Transformation}
     params::P
+    prep::PREP
     grad_calc::Symbol
     Bs::Vector{Nullable{Matrix{T}}}  # these are the fixed/random matrices Bᵢ for the DFA method
 end
@@ -18,6 +19,7 @@ Chain(ts::Transformation...; kw...) = Chain(Float64, ts...; kw...)
 Chain{T}(::Type{T}, ts::Transformation...; kw...) = Chain(T, convert(Array{Transformation}, collect(ts)); kw...)
 
 function Chain{T,TR<:Transformation}(::Type{T}, ts::AbstractVector{TR};
+                                     prep::PreprocessStep = NoPreprocessing(),
                                      grad_calc::Symbol = :backprop)
     link_nodes!(ts)
 
@@ -49,6 +51,7 @@ function Chain{T,TR<:Transformation}(::Type{T}, ts::AbstractVector{TR};
         output_node(ts[end]),
         ts,
         consolidate_params(T, ts),
+        prep,
         grad_calc,
         Bs
     )
@@ -86,6 +89,12 @@ end
 # now that it's set up, just go forward to transform, or backwards to backprop
 
 function transform!(chain::Chain)
+    if !isa(chain.prep, NoPreprocessing)
+        # update the whitener and transform the input data
+        copy!(input_value(chain.prep), input_value(chain))
+        learn!(chain.prep)
+        copy!(input_value(chain), transform!(chain.prep))
+    end
     for (i,t) in enumerate(chain.ts)
         i > 1 && transform!(input_node(t))
         transform!(t)

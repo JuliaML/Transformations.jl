@@ -10,6 +10,7 @@ function nnet_layers(nin::Int, nout::Int;
     ns = vcat(nin, nh, nout)
     num_affine = length(ns) - 1
     layers = Transformation[]
+
     for i=1:num_affine
         # push!(layers, (layernorm ? LayerNorm : Affine)(ns[i], ns[i+1]))
         if inputnorm
@@ -34,14 +35,17 @@ function nnet_layers(nin::Int, nout::Int;
 end
 
 function nnet(nin::Int, nout::Int, nh::AbstractVector{Int},
-              iact = :tanh, fact = :identity; grad_calc = :backprop, kw...)
+              iact = :tanh, fact = :identity;
+              prep = NoPreprocessing(),
+              grad_calc = :backprop,
+              kw...)
     Chain(Float64, nnet_layers(
         nin, nout;
         nh=nh,
         inner_activation=iact,
         final_activation=fact,
         kw...
-    ), grad_calc=grad_calc)
+    ), prep=prep, grad_calc=grad_calc)
 end
 
 # ---------------------------------------------------------------------

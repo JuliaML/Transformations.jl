@@ -5,6 +5,7 @@
 
 abstract PreprocessStep <: Learnable
 immutable NoPreprocessing <: PreprocessStep end
+transform!(prep::NoPreprocessing, x) = x
 
 #=
 Solving for a dimension-reduced Y = VX, where X (nin x nobs) is the original data,
@@ -34,7 +35,7 @@ type Whiten{T,METHOD,W<:Weight} <: PreprocessStep
     input::SumNode{T,1}
     output::OutputNode{T,1}
  end
- Whiten(nin::Int, nout::Int; kw...) = Whiten(Float64, nin, nout; kw...)
+ Whiten(nin::Int, nout::Int = nin; kw...) = Whiten(Float64, nin, nout; kw...)
 
 function Whiten{T}(::Type{T},
                     nin::Int,

@@ -175,13 +175,13 @@ include("misc.jl")
 include("layernorm.jl")
 include("inputnorm.jl")
 include("activations.jl")
+include("whiten.jl")
 include("chain.jl")
 include("nnet.jl")
 include("convolutions.jl")
 include("pooling.jl")
 include("functions.jl")
 include("distributions.jl")
-include("whiten.jl")
 
 # ----------------------------------------------------------------
 
