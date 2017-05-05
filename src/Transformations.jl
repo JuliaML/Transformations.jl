@@ -14,7 +14,7 @@ import LearnBase: transform, transform!,
                   learn!
 # import StatsBase: logistic, logit
 import OnlineStats
-import OnlineStats: weight, Weight, BoundedEqualWeight, Variances
+import OnlineStats: weight, Weight, BoundedEqualWeight
 
 export
     input_node,
@@ -173,7 +173,7 @@ include("linear.jl")
 include("affine.jl")
 include("misc.jl")
 include("layernorm.jl")
-include("inputnorm.jl")
+# include("inputnorm.jl")
 include("activations.jl")
 include("whiten.jl")
 include("chain.jl")

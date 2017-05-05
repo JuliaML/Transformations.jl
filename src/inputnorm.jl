@@ -2,6 +2,9 @@
 #=
 Similar to Batch Normalization, except online and without the rescaling/skew
     y = (a .- μ) ./ σ
+
+    TODO: This is currently broken because OnlineStats.Variances no longer
+    exists. 
 =#
 type InputNorm{T,W<:Weight} <: Transformation
     n::Int  # maps n --> n
