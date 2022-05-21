@@ -1,3 +1,7 @@
+# DEPRECATED
+
+This package is deprecated.
+
 # Transformations
 
 [![Build Status](https://travis-ci.org/JuliaML/Transformations.jl.svg?branch=master)](https://travis-ci.org/JuliaML/Transformations.jl)
